@@ -86,10 +86,10 @@ namespace Vox
             }
         }
 
-        public Oct(int minlevel, int maxlevel, Model.Mip[] sides, int size) : this(minlevel, maxlevel, new Loc(0, 0, 0, 0), sides, size)
+        public Oct(int minlevel, int maxlevel, float[][] sides, int size) : this(minlevel, maxlevel, new Loc(0, 0, 0, 0), sides, size)
         { }
 
-        int IsHitX(Vector3[] mm, Model.Mip[] sides, int size)
+        int IsHitX(Vector3[] mm, float[][] sides, int size)
         {
             return IsHit(new Vector2[4] {
                     new Vector2(mm[0].X, mm[0].Y),
@@ -102,7 +102,7 @@ namespace Vox
             size);
         }
 
-        int IsHitY(Vector3[] mm, Model.Mip[] sides, int size)
+        int IsHitY(Vector3[] mm, float[][] sides, int size)
         {
             return IsHit(new Vector2[4] {
                     new Vector2(mm[0].X, 1 - mm[0].Z),
@@ -115,7 +115,7 @@ namespace Vox
             size);
         }
 
-        int IsHit(Vector2[] v, float z0, float z1, Model.Mip side0, Model.Mip side1, int size)
+        int IsHit(Vector2[] v, float z0, float z1, float[] side0, float[] side1, int size)
         {
             int hitcnt = 0;
             for (int i = 0; i < v.Length; ++i)
@@ -137,7 +137,7 @@ namespace Vox
             return hitcnt;
         }
 
-        Oct(int minlevel, int maxlevel, Loc cl, Mip[] sides, int size)
+        Oct(int minlevel, int maxlevel, Loc cl, float[][] sides, int size)
         {
             l = cl;
 

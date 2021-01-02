@@ -31,49 +31,7 @@ namespace Vox
             new RenderTarget(Size, Size, new TextureR32()),
             new RenderTarget(Size, Size, new TextureR32()),
             new RenderTarget(Size, Size, new TextureR32()) };
-
-        public struct Mip
-        {
-            float[][] d;
-
-            public Mip(float[] indata, bool domin)
-            {
-                int levels = (int)Math.Round(Math.Log(Model.Size) / Math.Log(2));
-                d = new float[levels][];
-                d[0] = indata;
-                int curSize = Model.Size;
-                for (int i = 1; i < levels; ++i)
-                {
-                    int prevSize = curSize;
-                    curSize /= 2;
-                    float[] rd = d[i - 1];
-                    d[i] = new float[curSize * curSize];
-                    float[] wr = d[i];
-                    for (int y = 0; y < curSize; ++y)
-                    {
-                        for (int x = 0; y < curSize; ++x)
-                        {
-                            float[] v = new float[4];
-                            v[0] = rd[(y * 2) * prevSize + (x * 2)];
-                            v[1] = rd[(y * 2) * prevSize + (x * 2 + 1)];
-                            v[2] = rd[(y * 2 + 1) * prevSize + (x * 2)];
-                            v[3] = rd[(y * 2 + 1) * prevSize + (x * 2 + 1)];
-                            int ci = 0;
-                            while (v[ci] == 0 && ci < 4) ci++;
-                            float finalval = ci < 4 ? v[ci] : 0;
-                            for (; ci < 4; ++ci)
-                            {
-                                if (v[ci] == 0) continue;
-                                finalval = domin ? Math.Min(finalval, v[ci]) : Math.Max(finalval, v[ci]);
-                            }
-                            wr[y * curSize + x] = finalval;
-                        }
-                    }
-                }
-            }
-        }
-
-        Mip[] buf = null;
+        float[][] buf = null;
 
         static int Size = 1024;
 
