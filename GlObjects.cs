@@ -402,6 +402,55 @@ namespace GLObjects
         }
     }
 
+    public class TextureRG64 : Texture
+    {
+        public TextureRG64()
+        {
+        }
+
+        public override void Create(int width, int height)
+        {
+            LoadData(width, height, IntPtr.Zero);
+        }
+
+        public void LoadData(int width, int height, IntPtr data)
+        {
+            Width = width;
+            Height = height;
+            GL.ActiveTexture(TextureUnit.Texture0);
+            GL.BindTexture(TextureTarget.Texture2D, TextureName);
+
+            GL.TexImage2D(TextureTarget2d.Texture2D, 0, TextureComponentCount.Rg32f,
+                width, height, 0, PixelFormat.Rg, PixelType.Float,
+                data);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToBorder);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToBorder);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureBorderColor, new float[] { 0, 0, 0 });
+        }
+
+        public override void BindToIndex(int idx)
+        {
+            GL.ActiveTexture(TextureUnit.Texture0 + idx);
+            GL.BindTexture(TextureTarget.Texture2D, TextureName);
+        }
+    }
+
+    public struct Rg32
+    {
+        public float r;
+        public float g;
+    }
+
+    public struct Rgba32
+    {
+        public float r;
+        public float g;
+        public float b;
+        public float a;
+    }
+
     public class TextureR8 : Texture
     {
         public TextureR8()

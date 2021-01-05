@@ -9,7 +9,7 @@ using System.Diagnostics;
 
 namespace Vox
 {
-    struct Loc : IComparable<Loc>
+    struct Loc : IComparable<Loc>, IEqualityComparer<Loc>
     {
         public int lev;
         public long x;
@@ -22,6 +22,14 @@ namespace Vox
             x = _x; y = _y; z = _z;
         }
 
+
+        public Loc GetParentAtLevel(int l)
+        {
+            if (l >= lev)
+                return this;
+            int d = lev - l;
+            return new Loc(l, x >> d, y >> d, z >> d);
+        }
 
         public Loc this[int i]
         {
@@ -36,6 +44,8 @@ namespace Vox
 
         public int CompareTo(Loc other)
         {
+            int l = lev.CompareTo(other.lev);
+            if (l != 0) return l;
             int c = z.CompareTo(other.z);
             if (c != 0) return c;
             c = y.CompareTo(other.y);
@@ -46,7 +56,7 @@ namespace Vox
         public Vector4 GetPosScale()
         {
             float scale = 1.0f / (float)(1 << lev);
-            return new Vector4(x * scale, y * scale, z * scale, scale);
+            return new Vector4((x + 0.5f) * scale, (y + 0.5f) * scale, (z + 0.5f) * scale, scale);
         }
 
         public Vector3[] GetBox()
@@ -59,6 +69,18 @@ namespace Vox
         public override string ToString()
         {
             return $"{lev} [{x} {y} {z}]";
+        }
+
+        public bool Equals(Loc x, Loc y)
+        {
+            return x.lev == y.lev && x.x == y.x &&
+                x.y == y.y && x.z == y.z;
+        }
+
+        public int GetHashCode(Loc obj)
+        {
+            return (int)(obj.lev * 1313 * obj.x * 7 + obj.y * 3 +
+                obj.z * 131);
         }
     }
 
@@ -86,58 +108,115 @@ namespace Vox
             }
         }
 
-        public Oct(int minlevel, int maxlevel, float[][] sides, int size) : this(minlevel, maxlevel, new Loc(0, 0, 0, 0), sides, size)
-        { }
-
-        int IsHitX(Vector3[] mm, float[][] sides, int size)
+        public static List<Loc> clocs = new List<Loc>();
+        public bool Collapse()
         {
-            return IsHit(new Vector2[4] {
-                    new Vector2(mm[0].X, mm[0].Y),
-                    new Vector2(mm[1].X, mm[0].Y),
-                    new Vector2(mm[0].X, mm[1].Y),
-                    new Vector2(mm[1].X, mm[1].Y) },
-            mm[0].Z, mm[1].Z,
-            sides[0],
-            sides[1],
-            size);
-        }
+            clocs.Add(l);
+            if (n == null)
+                return true;
 
-        int IsHitY(Vector3[] mm, float[][] sides, int size)
-        {
-            return IsHit(new Vector2[4] {
-                    new Vector2(mm[0].X, 1 - mm[0].Z),
-                    new Vector2(mm[1].X, 1 - mm[0].Z),
-                    new Vector2(mm[0].X, 1 - mm[1].Z),
-                    new Vector2(mm[1].X, 1 - mm[1].Z) },
-            mm[0].Y, mm[1].Y,
-            sides[2],
-            sides[3],
-            size);
-        }
-
-        int IsHit(Vector2[] v, float z0, float z1, float[] side0, float[] side1, int size)
-        {
-            int hitcnt = 0;
-            for (int i = 0; i < v.Length; ++i)
+            int visiblecnt = 0;
+            bool cancollapse = true;
+            for (int i = 0; i < 8; ++i)
             {
-                int w = (int)((v[i].X) * (size - 1));
-                int h = (int)((v[i].Y) * (size - 1));
-                float d0 = side0[h * size + w];
-                float d1 = side1[h * size + w];
-                bool hit0 =
-                    (d0 != 0) && (d0 < z0) &&
-                    (d1 != 0) && (d1 > z0);
-                hitcnt += hit0 ? 1 : 0;
-                bool hit1 =
-                    (d0 != 0) && (d0 < z1) &&
-                    (d1 != 0) && (d1 > z1);
-                hitcnt += hit1 ? 1 : 0;
+                cancollapse &= n[i].Collapse();
+                visiblecnt += n[i].visible ? 1 : 0;
             }
 
-            return hitcnt;
+            if (cancollapse && (visiblecnt == 0 || visiblecnt == 8))
+            {
+                if (visiblecnt == 8)
+                {
+                    Vector3 nColor = Vector3.Zero;
+                    for (int i = 0; i < 8; ++i)
+                    {
+                        nColor += n[i].color;
+                    }
+
+                    this.color = nColor / 8.0f;
+                }
+                n = null;
+                visible = visiblecnt == 8 ? true : false;
+                return true;
+            }
+
+            return false;
         }
 
-        Oct(int minlevel, int maxlevel, Loc cl, float[][] sides, int size)
+        public Oct(int minlevel, int maxlevel, Rgba32[][] sides, int size) : this(minlevel, maxlevel, new Loc(0, 0, 0, 0), sides, size)
+        { }
+
+
+        public Oct GetAtLoc(Loc _l)
+        {
+            if (_l.lev == l.lev)
+                return this;
+
+            if (n == null)
+                return null;
+
+            Loc p = _l.GetParentAtLevel(l.lev + 1);
+            foreach (Oct o in n)
+            {
+                if (o.l.Equals(p))
+                    return o.GetAtLoc(_l);
+            }
+
+            return null;
+        }
+
+      
+        bool IsHitX(Vector3[] mm, Rgba32[][] sides, int size, out float c)
+        {
+            return IsHit(
+                    new Vector2((mm[0].X + mm[1].X) * 0.5f,
+                    (mm[0].Y + mm[1].Y) * 0.5f),
+            (mm[0].Z + mm[1].Z) * 0.5f,
+            sides[0],
+            sides[1],
+            size,
+            out c);
+        }
+
+        bool IsHitY(Vector3[] mm, Rgba32[][] sides, int size, out float c)
+        {
+            return IsHit(
+                    new Vector2((mm[0].X + mm[1].X) * 0.5f,
+                    1 - ((mm[0].Z + mm[1].Z) * 0.5f)),
+            (mm[0].Y + mm[1].Y) * 0.5f,
+            sides[2],
+            sides[3],
+            size,
+            out c);
+        }
+
+        bool IsHit(Vector2 v, float z, Rgba32[] side0, Rgba32[] side1, int size, out float c)
+        {
+            int w = (int)((v.X) * (size - 1));
+            int h = (int)((v.Y) * (size - 1));
+            float d0 = side0[h * size + w].r;
+            float d1 = side1[h * size + w].r;
+            float a0 = side0[h * size + w].g;
+            float a1 = side1[h * size + w].g;
+            if (a0 == 0 && a1 == 0)
+            {
+                c = 0;
+                return false;
+            }
+
+            c = a0 > 0 ? side0[h * size + w].b :
+                side1[h * size + w].b;
+            return 
+                ((a0 == 0) || (d0 < z)) &&
+                ((a1 == 0) || (d1 > z));
+        }
+
+        Vector4 Decode(float c)
+        {
+            return new Vector4(c % 1, (c / 256) % 1, (c / (256 * 256)), 1 );
+        }
+
+        Oct(int minlevel, int maxlevel, Loc cl, Rgba32[][] sides, int size)
         {
             l = cl;
 
@@ -151,25 +230,19 @@ namespace Vox
             }
             else
             {
-                int hitcntX = IsHitX(l.GetBox(), sides, size);
-                int hitcntY = hitcntX; // IsHitY(l.GetBox(), sides, size);
-                if (hitcntX == 0 || hitcntY == 0)
-                {
-                    this.visible = false;
-                }
-                else if ((hitcntX == 8 && hitcntY == 8) ||
-                    l.lev == maxlevel)
-                {
-                    this.visible = true;
-                }
-                else
-                {
-                    n = new Oct[8];
-                    for (int i = 0; i < 8; ++i)
-                    {
-                        n[i] = new Oct(minlevel, maxlevel, l[i], sides, size);
-                    }
-                }
+                float cx;
+                float cy;
+                bool isHit = IsHitX(l.GetBox(), sides, size, out cx);
+                isHit &= IsHitY(l.GetBox(), sides, size, out cy);
+                Vector4 c = Vector4.Zero;
+                if (cx > 0)
+                    c += Decode(cx);
+                if (cy > 0)
+                    c += Decode(cy);
+
+                c /= c.W;
+                this.color = new Vector3(c);
+                this.visible = isHit;
             }
         }
 

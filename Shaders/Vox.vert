@@ -12,7 +12,7 @@ out vec3 vWsPos;
 out vec3 vNormal;
 out vec4 vVox;
 void main() {
-    vec4 ipos = vec4(aPosition * aInstData0.w + aInstData0.xyz, 1.0);
+    vec4 ipos = vec4(aPosition * aInstData0.w * 0.5 + aInstData0.xyz, 1.0);
     gl_Position = uMVP * ipos;
     vec3 norm = aNormal;
     vWsPos = (uWorld * ipos).xyz;

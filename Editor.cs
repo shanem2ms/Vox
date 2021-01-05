@@ -32,6 +32,7 @@ namespace Vox
         int mouseWheelOffset = 0;
         Quaternion curViewrotate = Quaternion.Identity;
         RenderTarget pickTarget;
+        Oct selectedNode = null;
 
         Model modelVA;
         
@@ -90,8 +91,8 @@ namespace Vox
             gridVA = new VertexArray(this._Program, qpts.ToArray(), ind.ToArray(), colors.ToArray(), nrm);
 
 
-            modelVA = new Model(@"C:\Users\shane\Documents\bunny.obj");
-            oct = this.modelVA.BuildOct(5, 8);
+            modelVA = new Model(@"C:\Users\shane\Documents\helene2.ply");
+            oct = this.modelVA.BuildOct(7, 8);
             octVA = OctViz.BuildVA(_ProgramInst, oct);
         }
 
@@ -118,7 +119,7 @@ namespace Vox
 
             _Program.SetMVP(Matrix4.CreateScale(64), viewProj);
             DrawVox(0);
-            this.modelVA.DebugDraw();
+//            this.modelVA.DebugDraw();
         }
 
         struct GLPixelf
@@ -175,6 +176,8 @@ namespace Vox
             int y = (int)Math.Round(v.g / v.a);
             int z = (int)Math.Round(v.b / v.a);
             int l = (int)Math.Round(Math.Log(1 / v.a) / Math.Log(2));
+
+            this.selectedNode = this.oct.GetAtLoc(new Loc(l, x, y, z));
             System.Diagnostics.Debug.WriteLine($"{l} [{x}, {y}, {z}]");
             FrameBuffer.BindNone();
 
