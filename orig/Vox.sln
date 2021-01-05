@@ -1,0 +1,24 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30804.86
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Vox", "Vox.csproj", "{FE99D45F-3B67-4CFF-8154-966C00B6DAD4}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{FE99D45F-3B67-4CFF-8154-966C00B6DAD4}.Debug|x64.ActiveCfg = Debug|x64
+		{FE99D45F-3B67-4CFF-8154-966C00B6DAD4}.Debug|x64.Build.0 = Debug|x64
+		{FE99D45F-3B67-4CFF-8154-966C00B6DAD4}.Release|x64.ActiveCfg = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {324F4F5B-9C71-44BA-A03B-B44A56449A16}
+	EndGlobalSection
+EndGlobal
