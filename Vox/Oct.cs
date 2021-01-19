@@ -1,11 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using GLObjects;
-using OpenTK;
-using System.Diagnostics;
+using System.Numerics;
 
 namespace Vox
 {
@@ -241,7 +237,7 @@ namespace Vox
                     c += Decode(cy);
 
                 c /= c.W;
-                this.color = new Vector3(c);
+                this.color = new Vector3(c.X, c.Y, c.Z);
                 this.visible = isHit;
             }
         }
@@ -302,7 +298,7 @@ namespace Vox
             {
                 Vector3 d1 = _Cube[i * 6 + 1] - _Cube[i * 6];
                 Vector3 d2 = _Cube[i * 6 + 2] - _Cube[i * 6 + 1];
-                Vector3 nrm = Vector3.Cross(d1, d2).Normalized();
+                Vector3 nrm = Vector3.Normalize(Vector3.Cross(d1, d2));
                 for (int nIdx = 0; nIdx < 6; ++nIdx)
                 {
                     nrmCoords[i * 6 + nIdx] = nrm;
@@ -324,7 +320,7 @@ namespace Vox
             leafs.Sort();
             Vector4[] ind0 = leafs.Select(l => l.l.GetPosScale()).ToArray();
             Vector4[] ind1 = leafs.Select(l => new Vector4(l.color, 0)).ToArray();
-            return new VertexArray(program, _Cube, indices, nrmCoords, ind0, ind1);
+            return new VertexArray(_Cube, indices, nrmCoords, ind0, ind1);
         }
 
 
