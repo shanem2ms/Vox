@@ -23,6 +23,11 @@ namespace Vox
         public float g;
         public float b;
         public float a;
+
+        public override string ToString()
+        {
+            return $"{r} {g} {b} {a}";
+        }
     }
 
 
@@ -38,6 +43,7 @@ namespace Vox
         public static IShader Phong;
         public static IShader Blit;
         public static IShader Depth;
+        public static bool FlushAtEnd = false;
 
         public static void CreateGraphics(GraphicsDevice g, ResourceFactory factory, uint sw, uint sh)
         {
@@ -196,11 +202,11 @@ namespace Vox
 
     public class VertexArray
     {
-        Vector3[] _positions;
-        uint[] _elems;
-        Vector3[] _normals;
-        Vector4[] _instanceData0;
-        Vector4[] _instanceData1;
+        public Vector3[] _positions;
+        public uint[] _elems;
+        public Vector3[] _normals;
+        public Vector4[] _instanceData0;
+        public Vector4[] _instanceData1;
 
         public VertexArray(Vector3[] positions, uint[] elems, Vector3[] normals,
             Vector4[] instanceData0, Vector4[] instanceData1)

@@ -77,16 +77,31 @@ namespace Vox
             DrawMain();
             Utils.Cl.End();
             GraphicsDevice.SubmitCommands(Utils.Cl);
+            if (Utils.FlushAtEnd)
+            {
+                Utils.G.WaitForIdle();
+                Utils.FlushAtEnd = false;
+            }
             GraphicsDevice.SwapBuffers();
         }
 
         Oct o = null;
 
+        static int frame = 0;
         private void DrawMain()
         {
-            if (o == null)
+            if (frame == 0)
+            {
+                modelVox.DrawOffscreen();
+                Utils.FlushAtEnd = true;
+            }
+            else if (o == null)
             {
                 o = modelVox.BuildOct(7, 8);
+                if (o != null)
+                {
+                    VertexArray va = OctViz.BuildVA(o);
+                }
             }
             modelVox.DrawOffscreen();
             Utils.Cl.SetFramebuffer(GraphicsDevice.SwapchainFramebuffer);
@@ -103,6 +118,7 @@ namespace Vox
                 Utils.Cl.SetIndexBuffer(plane.IndexBuffer, IndexFormat.UInt32);
                 Utils.Cl.DrawIndexed(plane.IndexCount, 1, 0, 0, 0);
             }
+            frame++;
         }
 
         private void UpdateUniformBuffers(int i)

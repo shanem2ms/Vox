@@ -229,12 +229,12 @@ namespace Vox
                 float cx;
                 float cy;
                 bool isHit = IsHitX(l.GetBox(), sides, size, out cx);
-                isHit &= IsHitY(l.GetBox(), sides, size, out cy);
+                //isHit &= IsHitY(l.GetBox(), sides, size, out cy);
                 Vector4 c = Vector4.Zero;
                 if (cx > 0)
                     c += Decode(cx);
-                if (cy > 0)
-                    c += Decode(cy);
+                //if (cy > 0)
+                //    c += Decode(cy);
 
                 c /= c.W;
                 this.color = new Vector3(c.X, c.Y, c.Z);
@@ -268,7 +268,7 @@ namespace Vox
 
     static class OctViz
     {
-        public static VertexArray BuildVA(Program program, Oct topNode)
+        public static VertexArray BuildVA(Oct topNode)
         {
             uint[] indices = new uint[_Cube.Length];
             Vector3[] texCoords = new Vector3[_Cube.Length];

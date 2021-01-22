@@ -82,8 +82,7 @@ namespace Vox
             public void CopyTexture()
             {
                 Utils.Cl.CopyTexture(_color, _staging);
-
-
+                
                 // When a texture is mapped into a CPU-visible region, it is often not laid out linearly.
                 // Instead, it is laid out as a series of rows, which are all spaced out evenly by a "row pitch".
                 // This spacing is provided in MappedResource.RowPitch.
@@ -181,28 +180,35 @@ namespace Vox
                 sides[idx].Draw();
                 Utils.Cl.SetVertexBuffer(0, _model.VertexBuffer);
                 Utils.Cl.SetIndexBuffer(_model.IndexBuffer, IndexFormat.UInt32);
-                Utils.Cl.DrawIndexed(_model.IndexCount, 1, 0, 0, 0);
-                sides[idx].CopyTexture();
+                Utils.Cl.DrawIndexed(_model.IndexCount, 1, 0, 0, 0);                
             }
         }
 
         public Oct BuildOct(int minLod, int maxLod)
         {
-            DrawOffscreen();
-            Rgba32[][] buf = new Rgba32[][] { sides[0]._pixelData,
+            for (int idx = 0; idx < 6; ++idx)
+            {
+                sides[idx].CopyTexture();
+            }
+            if (sides[0]._pixelData[0].a == 1)
+            {
+                Rgba32[][] buf = new Rgba32[][] { sides[0]._pixelData,
                 sides[1]._pixelData,
                 sides[2]._pixelData,
                 sides[3]._pixelData,
                 sides[4]._pixelData,
                 sides[5]._pixelData };
-            Oct o = new Oct(minLod, maxLod, buf, (int)ModelVox.Size);
-            List<Oct> leafs = new List<Oct>();
-            o.GetLeafNodes(leafs);
-            o.Collapse();
-            Oct.clocs.Sort();
-            leafs.Clear();
-            o.GetLeafNodes(leafs);
-            return o;
+                Oct o = new Oct(minLod, maxLod, buf, (int)ModelVox.Size);
+                List<Oct> leafs = new List<Oct>();
+                o.GetLeafNodes(leafs);
+                o.Collapse();
+                Oct.clocs.Sort();
+                leafs.Clear();
+                o.GetLeafNodes(leafs);
+                return o;
+            }
+            else
+                return null;
         }
     }
 }
