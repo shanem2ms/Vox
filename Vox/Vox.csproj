@@ -20,19 +20,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="chinesedragon.dae" LogicalName="chinesedragon.dae" />
-    <EmbeddedResource Include="darkmetal_bc3_unorm.ktx" LogicalName="darkmetal_bc3_unorm.ktx" />
     <EmbeddedResource Include="Shaders\**">
       <LogicalName>%(Filename)%(Extension)</LogicalName>
     </EmbeddedResource>
-  </ItemGroup>
-
-  <ItemGroup>
-    <EmbeddedResource Remove="Shaders\Blit.cs" />
-    <EmbeddedResource Remove="Shaders\Depth.cs" />
-    <EmbeddedResource Remove="Shaders\Inst.cs" />
-    <EmbeddedResource Remove="Shaders\Mirror.cs" />
-    <EmbeddedResource Remove="Shaders\Phong.cs" />
   </ItemGroup>
 
   <ItemGroup>
