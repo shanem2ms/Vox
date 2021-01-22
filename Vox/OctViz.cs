@@ -12,34 +12,64 @@ namespace Vox
 {
     class OctVizBlocks
     {
-        private Texture _color;
-        private Texture _staging;
         public TextureView _view;
         public Framebuffer _FB;
         public Pipeline _pipeline;
         private DeviceBuffer cbufferTransform;
         private DeviceBuffer vertexBuffer;
         private DeviceBuffer indexBuffer;
-        public Rgba32[] _pixelData;
-
-        int idx;
-        struct Vertex
+        private DeviceBuffer instanceBuffer;
+        private ResourceSet resourceSet;
+        uint indexCount;
+        uint instanceCount;
+        
+        public struct VertexInfo
         {
-            public Vector3 Pos;
-            public Vector3 Nrm;
+            public static uint Size { get; } = (uint)Unsafe.SizeOf<VertexInfo>();
+
+            public Vector3 Position;
+            public Vector3 Normal;
+
+            public VertexInfo(Vector3 position, Vector3 normal)
+            {
+                Position = position;
+                Normal = normal;
+            }
+        }
+
+        public struct InstanceInfo
+        {
+            public static uint Size { get; } = (uint)Unsafe.SizeOf<InstanceInfo>();
+
+            public Vector4 Inst0;
+            public Vector4 Inst1;
+
+            public InstanceInfo(Vector4 inst0, Vector4 inst1)
+            {
+                Inst0 = inst0;
+                Inst1 = inst1;
+            }
         }
 
         public OctVizBlocks(VertexArray va)
         {
-            Vertex[] vtx = new Vertex[va._positions.Length];
+            VertexInfo[] vtx = new VertexInfo[va._positions.Length];
             for (int idx = 0; idx < vtx.Length; ++idx)
             {
-                vtx[idx] = new Vertex() { Pos = va._positions[idx], Nrm = va._normals[idx] };
+                vtx[idx] = new VertexInfo(va._positions[idx],va._normals[idx]);
             }
-            vertexBuffer = Utils.Factory.CreateBuffer(new BufferDescription((uint)(24 * vtx.Length), BufferUsage.VertexBuffer));
+            InstanceInfo[] inst = new InstanceInfo[va._instanceData0.Length];
+            for (int idx = 0; idx < inst.Length; ++idx)
+            {
+                inst[idx] = new InstanceInfo(va._instanceData0[idx], va._instanceData1[idx]);
+            }
+
+            vertexBuffer = Utils.Factory.CreateBuffer(new BufferDescription((uint)(VertexInfo.Size * vtx.Length), BufferUsage.VertexBuffer));
             Utils.G.UpdateBuffer(vertexBuffer, 0, vtx);
-            indexBuffer = Utils.Factory.CreateBuffer(new BufferDescription((uint)(sizeof(uint) * va._elems.Length), BufferUsage.VertexBuffer));
+            indexBuffer = Utils.Factory.CreateBuffer(new BufferDescription((uint)(sizeof(uint) * va._elems.Length), BufferUsage.IndexBuffer));
             Utils.G.UpdateBuffer(indexBuffer, 0, va._elems);
+            instanceBuffer = Utils.Factory.CreateBuffer(new BufferDescription((uint)(InstanceInfo.Size * inst.Length), BufferUsage.VertexBuffer));
+            Utils.G.UpdateBuffer(instanceBuffer, 0, inst);
 
             VertexLayoutDescription vertexLayout = new VertexLayoutDescription(
                          new VertexElementDescription("Position", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float3),
@@ -53,10 +83,44 @@ namespace Vox
                 new ResourceLayoutElementDescription("UBO", ResourceKind.UniformBuffer, ShaderStages.Vertex)));
                            
             ShaderSetDescription instShaders = new ShaderSetDescription(
-                new[] { vertexLayout },
+                new[] { vertexLayout, instLayout },
                 Utils.Factory.CreateFromSpirv(
                 new ShaderDescription(ShaderStages.Vertex, Utils.LoadShaderBytes(Utils.G, "Inst-vertex"), "main"),
                 new ShaderDescription(ShaderStages.Fragment, Utils.LoadShaderBytes(Utils.G, "Inst-fragment"), "main")));
+
+            GraphicsPipelineDescription pd = new GraphicsPipelineDescription(
+                BlendStateDescription.SingleOverrideBlend,
+                DepthStencilStateDescription.DepthOnlyLessEqual,
+                new RasterizerStateDescription(FaceCullMode.None, PolygonFillMode.Solid, FrontFace.Clockwise, true, false),
+                PrimitiveTopology.TriangleList,
+                instShaders,
+                cbLayout,
+                Utils.G.SwapchainFramebuffer.OutputDescription);
+
+            _pipeline = Utils.Factory.CreateGraphicsPipeline(pd);
+            cbufferTransform = Utils.Factory.CreateBuffer(new BufferDescription((uint)Marshal.SizeOf<Shaders.Inst.Transform>(), BufferUsage.UniformBuffer | BufferUsage.Dynamic));
+            resourceSet = Utils.Factory.CreateResourceSet(new ResourceSetDescription(cbLayout, cbufferTransform));
+        }
+
+
+        public void UpdateUniformBuffer()
+        {
+            Vox.Shaders.Inst.Transform ui = new Vox.Shaders.Inst.Transform { LightPos = new Vector4(0, 0, 0, 1) };
+            ui.Projection = Matrix4x4.CreatePerspectiveFieldOfView(1.0f, 1.0f, 0.01f, 10.0f);
+            ui.View = Matrix4x4.Identity;
+            ui.Model = Matrix4x4.Identity;
+            Utils.G.UpdateBuffer(cbufferTransform, 0, ref ui);
+        }
+
+        public void Draw()
+        {
+            UpdateUniformBuffer();
+            Utils.Cl.SetPipeline(_pipeline);
+            Utils.Cl.SetGraphicsResourceSet(0, resourceSet);
+            Utils.Cl.SetVertexBuffer(0, vertexBuffer);
+            Utils.Cl.SetIndexBuffer(indexBuffer, IndexFormat.UInt32);
+            Utils.Cl.SetVertexBuffer(1, instanceBuffer);
+            Utils.Cl.DrawIndexed(indexCount, instanceCount, 0, 0, 0);
         }
 
     };
