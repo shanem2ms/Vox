@@ -18,13 +18,14 @@ namespace Vox
 
         private Plane plane;
         private Pipeline _dbgPipeline;
-        private DeviceBuffer []blitTransform;
-        private ResourceSet []_dbgResourceSet;
+        private DeviceBuffer[] blitTransform;
+        private ResourceSet[] _dbgResourceSet;
         ModelVox modelVox;
+        OctVizBlocks octVizBlocks;
 
         public VoxMain(ApplicationWindow window) : base(window)
         {
-            _camera.Position = new Vector3(0, 1, 6f);
+            _camera.Position = new Vector3(0, 1, -6f);
         }
 
         protected override void CreateResources(ResourceFactory factory)
@@ -101,22 +102,28 @@ namespace Vox
                 if (o != null)
                 {
                     VertexArray va = OctViz.BuildVA(o);
+                    octVizBlocks = new OctVizBlocks(va);
                 }
             }
-            modelVox.DrawOffscreen();
             Utils.Cl.SetFramebuffer(GraphicsDevice.SwapchainFramebuffer);
             Utils.Cl.SetFullViewports();
             Utils.Cl.ClearColorTarget(0, RgbaFloat.Black);
             Utils.Cl.ClearDepthStencil(1f);
-
-            for (int i = 0; i < 6; ++i)
+            if (octVizBlocks != null)
             {
-                UpdateUniformBuffers(i);
-                Utils.Cl.SetPipeline(_dbgPipeline);
-                Utils.Cl.SetGraphicsResourceSet(0, _dbgResourceSet[i]);
-                Utils.Cl.SetVertexBuffer(0, plane.VertexBuffer);
-                Utils.Cl.SetIndexBuffer(plane.IndexBuffer, IndexFormat.UInt32);
-                Utils.Cl.DrawIndexed(plane.IndexCount, 1, 0, 0, 0);
+                octVizBlocks.Draw(_camera);
+            }
+            else
+            {
+                for (int i = 0; i < 6; ++i)
+                {
+                    UpdateUniformBuffers(i);
+                    Utils.Cl.SetPipeline(_dbgPipeline);
+                    Utils.Cl.SetGraphicsResourceSet(0, _dbgResourceSet[i]);
+                    Utils.Cl.SetVertexBuffer(0, plane.VertexBuffer);
+                    Utils.Cl.SetIndexBuffer(plane.IndexBuffer, IndexFormat.UInt32);
+                    Utils.Cl.DrawIndexed(plane.IndexCount, 1, 0, 0, 0);
+                }
             }
             frame++;
         }
@@ -126,12 +133,12 @@ namespace Vox
             int x = i % 3;
             int y = i / 3;
             Shaders.Blit.Transform ui = new Shaders.Blit.Transform
-            { MWP = Matrix4x4.CreateScale(new Vector3(2f/3f,1,1)) * Matrix4x4.CreateTranslation(new Vector3(-1 + (x * 2f / 3f), -1 + y, 0)) };
+            { MWP = Matrix4x4.CreateScale(new Vector3(2f / 3f, 1, 1)) * Matrix4x4.CreateTranslation(new Vector3(-1 + (x * 2f / 3f), -1 + y, 0)) };
             GraphicsDevice.UpdateBuffer(blitTransform[i], 0, ref ui);
         }
 
-       
-       
+
+
     }
 }
 

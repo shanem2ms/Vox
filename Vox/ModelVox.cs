@@ -1,5 +1,4 @@
 ﻿using Common;
-using SampleBase;
 using System;
 using System.IO;
 using System.Numerics;

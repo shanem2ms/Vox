@@ -60,11 +60,29 @@ namespace Vox.Shaders
             return output;
         }
 
+        static Vector3 Reflect(Vector3 i, Vector3 n)
+        {
+            return i - 2 * n * Vector3.Dot(i, n);
+        }
         [FragmentShader]
         public Vector4 FS(FragmentInput input)
         {
+            Vector3 eye = Vector3.Normalize(-input.fsEyePos);
+            Vector3 reflected = Vector3.Normalize(Reflect(-input.fsLightVec, input.fsNormal));            
+            float diff = ShaderBuiltins.Clamp(Vector3.Dot(input.fsNormal, input.fsLightVec), 0, 100000);
+            Vector4 ambient = new Vector4(input.fsColor, 1) * (1 - diff);
+            Vector4 diffvec = new Vector4(diff, diff, diff, diff);
+            float specular = 0.75f;
+            Vector4 specvec = new Vector4(0, 0, 0, 0);
+            if (Vector3.Dot(input.fsEyePos, input.fsNormal) < 0)
+            {
+                specvec = new Vector4(0.5f, 0.5f, 0.5f, 1.0f) * (float)ShaderBuiltins.Pow(ShaderBuiltins.Clamp(Vector3.Dot(reflected, eye), 0, 100000), 16.0f) *
+                    specular;
+            }
+
+            return (ambient + diffvec) * new Vector4(input.fsColor, 1) + specvec;
+
             /*
-                vec3 Eye = normalize(-fsin_eyePos);
                 vec3 Reflected = normalize(reflect(-fsin_lightVec, fsin_normal));
                 vec4 IAmbient = vec4(0.1f, 0.1f, 0.1f, 1.0f);
                 float diff = clamp(dot(fsin_normal, fsin_lightVec), 0.f, 100000);

@@ -4,6 +4,7 @@ using System.IO;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using Veldrid;
+using SampleBase;
 using System.Collections.Generic;
 using Veldrid.SPIRV;
 using System.Runtime.InteropServices;
@@ -71,13 +72,16 @@ namespace Vox
             instanceBuffer = Utils.Factory.CreateBuffer(new BufferDescription((uint)(InstanceInfo.Size * inst.Length), BufferUsage.VertexBuffer));
             Utils.G.UpdateBuffer(instanceBuffer, 0, inst);
 
+            indexCount = (uint)va._elems.Length;
+            instanceCount = (uint)inst.Length;
             VertexLayoutDescription vertexLayout = new VertexLayoutDescription(
                          new VertexElementDescription("Position", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float3),
                          new VertexElementDescription("Normal", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float3));
-
+                                                                                                                                                                     
             VertexLayoutDescription instLayout = new VertexLayoutDescription(
                          new VertexElementDescription("InstData0", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float4),
                          new VertexElementDescription("InstData1", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float4));
+            instLayout.InstanceStepRate = 1;
 
             ResourceLayout cbLayout = Utils.Factory.CreateResourceLayout(new ResourceLayoutDescription(
                 new ResourceLayoutElementDescription("UBO", ResourceKind.UniformBuffer, ShaderStages.Vertex)));
@@ -103,18 +107,18 @@ namespace Vox
         }
 
 
-        public void UpdateUniformBuffer()
+        public void UpdateUniformBuffer(Camera c)
         {
             Vox.Shaders.Inst.Transform ui = new Vox.Shaders.Inst.Transform { LightPos = new Vector4(0, 0, 0, 1) };
-            ui.Projection = Matrix4x4.CreatePerspectiveFieldOfView(1.0f, 1.0f, 0.01f, 10.0f);
-            ui.View = Matrix4x4.Identity;
-            ui.Model = Matrix4x4.Identity;
+            ui.Projection = c.ProjectionMatrix;
+            ui.View = c.ViewMatrix;
+            ui.Model = Matrix4x4.CreateScale(10);
             Utils.G.UpdateBuffer(cbufferTransform, 0, ref ui);
         }
 
-        public void Draw()
+        public void Draw(Camera c)
         {
-            UpdateUniformBuffer();
+            UpdateUniformBuffer(c);
             Utils.Cl.SetPipeline(_pipeline);
             Utils.Cl.SetGraphicsResourceSet(0, resourceSet);
             Utils.Cl.SetVertexBuffer(0, vertexBuffer);
