@@ -4,13 +4,14 @@ using System.Linq;
 using System.Numerics;
 
 namespace Vox
-{
+{    
     struct Loc : IComparable<Loc>, IEqualityComparer<Loc>
     {
         public int lev;
         public long x;
         public long y;
         public long z;
+
 
         public Loc(int l, long _x, long _y, long _z)
         {
@@ -82,6 +83,14 @@ namespace Vox
 
     class Oct : IComparable<Oct>
     {
+
+        enum HitResult
+        {
+            eAllOutside,
+            ePartial,
+            eAllInside
+        }
+
         public Loc l;
         public Vector3 color = Vector3.One;
         public Oct[] n;
@@ -139,7 +148,7 @@ namespace Vox
             return false;
         }
 
-        public Oct(int minlevel, int maxlevel, Rgba32[][] sides, int size) : this(minlevel, maxlevel, new Loc(0, 0, 0, 0), sides, size)
+        public Oct(int minlevel, int maxlevel, MMTex[] sides, int size) : this(minlevel, maxlevel, new Loc(0, 0, 0, 0), sides, size)
         { }
 
 
@@ -161,61 +170,70 @@ namespace Vox
             return null;
         }
 
-      
-        bool IsHitX(Vector3[] mm, Rgba32[][] sides, int size, out float c)
+
+        HitResult IsHitX(Vector3[] mm, MMTex[] sides, int lod, out float c)
         {
             return IsHit(
                     new Vector2((mm[0].X + mm[1].X) * 0.5f,
                     (mm[0].Y + mm[1].Y) * 0.5f),
-            (mm[0].Z + mm[1].Z) * 0.5f,
+            mm[0].Z, mm[1].Z,
             sides[0],
             sides[1],
-            size,
+            lod,
             out c);
         }
 
-        bool IsHitY(Vector3[] mm, Rgba32[][] sides, int size, out float c)
+        HitResult IsHitY(Vector3[] mm, MMTex[] sides, int lod, out float c)
         {
             return IsHit(
                     new Vector2((mm[0].X + mm[1].X) * 0.5f,
                     1 - ((mm[0].Z + mm[1].Z) * 0.5f)),
-            (mm[0].Y + mm[1].Y) * 0.5f,
+            mm[0].Y, mm[1].Y,
             sides[2],
             sides[3],
-            size,
+            lod,
             out c);
         }
 
-        bool IsHit(Vector2 v, float z, Rgba32[] side0, Rgba32[] side1, int size, out float c)
+        HitResult IsHit(Vector2 v, float nearz, float farz, MMTex near, MMTex far, int lod, out float c)
         {
+            int size = 1 << lod;
+            int mip = lod - 2;
             int w = (int)((v.X) * (size - 1));
             int h = (int)((v.Y) * (size - 1));
-            float d0 = side0[h * size + w].r;
-            float d1 = side1[h * size + w].r;
-            float a0 = side0[h * size + w].g;
-            float a1 = side1[h * size + w].g;
-            if (a0 == 0 && a1 == 0)
+            float nearmax = near[mip][h * size + w].r;
+            float nearmin = near[mip][h * size + w].g;
+            float farmax = far[mip][h * size + w].r;
+            float farmin = far[mip][h * size + w].g;
+            if (nearz >= farmax ||
+                farz <= nearmin)
             {
                 c = 0;
-                return false;
+                return HitResult.eAllOutside;
             }
 
-            c = a0 > 0 ? side0[h * size + w].b :
-                side1[h * size + w].b;
-            return 
-                ((a0 == 0) || (d0 < z)) &&
-                ((a1 == 0) || (d1 > z));
+            float a0 = near[mip][h * size + w].b;
+            c = a0 > 0 ? near[mip][h * size + w].b :
+                far[mip][h * size + w].b;
+            if (nearz > nearmax && 
+                farz < farmin)
+            {
+                return HitResult.eAllInside; 
+            }
+
+            return HitResult.ePartial;
         }
 
-        Vector4 Decode(float c)
+        Vector3 Decode(float c)
         {
-            return new Vector4(c % 1, (c / 256) % 1, (c / (256 * 256)), 1 );
+            return new Vector3(c % 1, (c / 256) % 1, (c / (256 * 256)));
         }
 
-        Oct(int minlevel, int maxlevel, Loc cl, Rgba32[][] sides, int size)
+        Oct(int minlevel, int maxlevel, Loc cl, MMTex[] sides, int size)
         {
             l = cl;
 
+            this.visible = false;
             if (l.lev < minlevel)
             {
                 n = new Oct[8];
@@ -226,19 +244,30 @@ namespace Vox
             }
             else
             {
-                float cx;
-                float cy;
-                bool isHit = IsHitX(l.GetBox(), sides, size, out cx);
-                //isHit &= IsHitY(l.GetBox(), sides, size, out cy);
-                Vector4 c = Vector4.Zero;
-                if (cx > 0)
-                    c += Decode(cx);
-                //if (cy > 0)
-                //    c += Decode(cy);
-
-                c /= c.W;
-                this.color = new Vector3(c.X, c.Y, c.Z);
-                this.visible = isHit;
+                float cx = 0;
+                float cy = 0;
+                HitResult hrX = IsHitX(l.GetBox(), sides, l.lev, out cx);
+                HitResult hrY = IsHitY(l.GetBox(), sides, l.lev, out cy);
+                if ((hrX == HitResult.eAllInside && hrY == HitResult.eAllInside)
+                    || (hrX == HitResult.ePartial && hrY == HitResult.ePartial && l.lev >= maxlevel))
+                {
+                    Vector3 c = Vector3.Zero;
+                    if (cx > 0)
+                        c = Decode(cx);
+                    if (cy > 0)
+                        c = Decode(cy);
+                    this.color = c;
+                    this.visible = true;
+                }
+                else if ((hrX == HitResult.ePartial || hrY == HitResult.ePartial) &&
+                    l.lev < maxlevel)
+                {
+                    n = new Oct[8];
+                    for (int i = 0; i < 8; ++i)
+                    {
+                        n[i] = new Oct(minlevel, maxlevel, l[i], sides, size);
+                    }
+                } 
             }
         }
 

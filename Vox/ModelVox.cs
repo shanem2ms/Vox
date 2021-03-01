@@ -2,7 +2,6 @@
 using System;
 using System.IO;
 using System.Numerics;
-using System.Runtime.CompilerServices;
 using Veldrid;
 using System.Collections.Generic;
 using Veldrid.SPIRV;
@@ -13,21 +12,25 @@ namespace Vox
 {
     class ModelVox
     {
+        
         public class Side
         {
             private Texture _color;
-            private Texture _staging;
-            public TextureView _view;
+            TextureView _view;
             public Framebuffer _FB;
             public Pipeline _pipeline;
             private DeviceBuffer cbufferTransform;
-            private ResourceSet depthResourceSet;
-            public Rgba32[] _pixelData;
+            private ResourceSet []depthResourceSets;
+            public MMTex _pixelData;
+            DownScale[] _mips;
+            Texture[] _staging;
+
+            public TextureView View => _mips[_mips.Length - 3].View;
 
             int idx;
 
             public Side(int _idx, ResourceFactory factory, uint width, uint height,
-                ShaderSetDescription depthShaders, ResourceLayout depthLayout)
+                ShaderSetDescription depthShaders, ResourceLayout depthLayout, DeviceBuffer[] materials)
             {
                 idx = _idx;
                 bool frontOrBack = (idx & 1) == 0;
@@ -48,18 +51,26 @@ namespace Vox
                     _FB.OutputDescription);
                 _pipeline = factory.CreateGraphicsPipeline(pd);
                 cbufferTransform = factory.CreateBuffer(new BufferDescription((uint)Marshal.SizeOf<Shaders.Depth.Transform>(), BufferUsage.UniformBuffer | BufferUsage.Dynamic));
-                depthResourceSet = factory.CreateResourceSet(new ResourceSetDescription(depthLayout, cbufferTransform));
+                depthResourceSets = new ResourceSet[materials.Length];
+                for (int idx = 0; idx < depthResourceSets.Length; ++idx)
+                {
+                    depthResourceSets[idx] = factory.CreateResourceSet(new ResourceSetDescription(depthLayout, cbufferTransform, materials[idx]));
+                }
 
-                _staging = factory.CreateTexture(TextureDescription.Texture2D(
-                                width, height, 1, 1,
-                                 PixelFormat.R32_G32_B32_A32_Float, TextureUsage.Staging));
-                _pixelData = new Rgba32[_staging.Width * _staging.Height]; 
+                int levels = (int)Math.Log2(width) - 2;
+                _mips = new DownScale[levels];
+                TextureView curView = _view;
+                for (int idx = 0; idx < levels; ++idx)
+                {
+                    _mips[idx] = new DownScale();
+                    _mips[idx].CreateResources(factory, curView, width >> (idx + 1), height >> (idx + 1));
+                    curView = _mips[idx].View;
+                }
             }
 
             public void UpdateUniformBufferOffscreen()
             {
-                Vox.Shaders.Depth.Transform ui = new Vox.Shaders.Depth.Transform { LightPos = new Vector4(0, 0, 0, 1) };
-
+                Vox.Shaders.Depth.Transform ui = new Vox.Shaders.Depth.Transform { LightPos = new Vector4(0, 0, 0, 1)};
                 ui.Projection = Matrix4x4.CreateScale(1, 1, 0.5f) *
                     Matrix4x4.CreateTranslation(0, 0, 0.5f);
 
@@ -78,43 +89,70 @@ namespace Vox
                 Utils.G.UpdateBuffer(cbufferTransform, 0, ref ui);
             }
 
-            public void CopyTexture()
+            public void CopyMips()
             {
-                Utils.Cl.CopyTexture(_color, _staging);
-                
-                // When a texture is mapped into a CPU-visible region, it is often not laid out linearly.
-                // Instead, it is laid out as a series of rows, which are all spaced out evenly by a "row pitch".
-                // This spacing is provided in MappedResource.RowPitch.
-
-                // It is also possible to obtain a "structured view" of a mapped data region, which is what is done below.
-                // With a structured view, you can read individual elements from the region.
-                // The code below simply iterates over the two-dimensional region and places each texel into a linear buffer.
-                // ImageSharp requires the pixel data be contained in a linear buffer.
-                MappedResourceView<Rgba32> map = Utils.G.Map<Rgba32>(_staging, MapMode.Read);
-
-                // Rgba32 is synonymous with PixelFormat.R8_G8_B8_A8_UNorm.
-                for (int y = 0; y < _staging.Height; y++)
+                if (_pixelData == null)
                 {
-                    for (int x = 0; x < _staging.Width; x++)
+                    _pixelData = new MMTex(_mips.Length + 1);
+                    _staging = new Texture[_mips.Length + 1];
+                    for (int idx = 0; idx < _pixelData.Length; ++idx)
                     {
-                        int index = (int)(y * _staging.Width + x);
-                        _pixelData[index] = map[x, y];
+                        Texture tex = idx == 0 ? _color : _mips[idx - 1].OutTexture;
+                        _staging[idx] = Utils.Factory.CreateTexture(TextureDescription.Texture2D(
+                            tex.Width, tex.Height, 1, 1,
+                             PixelFormat.R32_G32_B32_A32_Float, TextureUsage.Staging));
+                        _pixelData[_pixelData.Length - idx - 1] = new Rgba32[tex.Width * tex.Height];
                     }
                 }
-                Utils.G.Unmap(_staging); 
+                for (int idx = 0; idx < _pixelData.Length; ++idx)
+                {
+                    Texture tex = idx == 0 ? _color : _mips[idx - 1].OutTexture;
+                    Utils.Cl.CopyTexture(tex, _staging[idx]);
+                    CopyTexture(_staging[idx], _pixelData[_pixelData.Length - idx - 1]);
+                }
+            }
+            void CopyTexture(Texture tex, Rgba32[] pixelData)                 
+            {
+                MappedResourceView<Rgba32> map = Utils.G.Map<Rgba32>(tex, MapMode.Read);
+
+                for (int y = 0; y < tex.Height; y++)
+                {
+                    for (int x = 0; x < tex.Width; x++)
+                    {
+                        int index = (int)(y * tex.Width + x);
+                        pixelData[index] = map[x, y];
+                    }
+                }
+                Utils.G.Unmap(tex);
             }
 
-            public void Draw()
+            public void Prepare()
             {
                 bool frontOrBack = (idx & 1) == 0;
-                UpdateUniformBufferOffscreen();
                 Utils.Cl.SetFramebuffer(_FB);
                 Utils.Cl.SetFullViewports();
                 Utils.Cl.ClearColorTarget(0, RgbaFloat.Black);
                 Utils.Cl.ClearDepthStencil(frontOrBack ? 1f : 0f);
-
+                UpdateUniformBufferOffscreen();
                 Utils.Cl.SetPipeline(_pipeline);
-                Utils.Cl.SetGraphicsResourceSet(0, depthResourceSet);
+            }
+
+            public void Draw(int idx)
+            {
+                Utils.Cl.SetGraphicsResourceSet(0, depthResourceSets[idx]);
+            }
+
+            public void BuildMips()
+            {
+                for (int idx = 0; idx < _mips.Length; ++idx)
+                {
+                    _mips[idx].Draw();
+                }
+            }
+
+            public void WriteBmp(string path)
+            {
+                _pixelData.SaveTo(path);
             }
         };
 
@@ -125,16 +163,19 @@ namespace Vox
         TextureView[] views = null;
         public TextureView []View => views;
         static uint Size = 1024;
+        DeviceBuffer[] materialCbs;
 
         public ModelVox(string model)
         {
+            string extension = System.IO.Path.GetExtension(model);
+            extension = extension.Substring(1);
             using (Stream modelStream = File.OpenRead(model))
             {
                 _model = new Model(
                     Utils.G,
                     Utils.Factory,
                     modelStream,
-                    "ply",
+                    extension,
                     new[] { VertexElementSemantic.Position, VertexElementSemantic.TextureCoordinate, VertexElementSemantic.Color, VertexElementSemantic.Normal },
                     new Model.ModelCreateInfo(new Vector3(1, 1, 1), Vector2.One, Vector3.Zero));
             }
@@ -153,33 +194,49 @@ namespace Vox
                          new VertexElementDescription("Color", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float3),
                          new VertexElementDescription("Normal", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float3));
                                                                                                                                                  
-            ResourceLayout depthLayout = factory.CreateResourceLayout(new ResourceLayoutDescription(
-                new ResourceLayoutElementDescription("UBO", ResourceKind.UniformBuffer, ShaderStages.Vertex)));
+            ResourceLayout depthLayout = factory.CreateResourceLayout(new ResourceLayoutDescription(new ResourceLayoutElementDescription[] {
+                new ResourceLayoutElementDescription("UBO", ResourceKind.UniformBuffer, ShaderStages.Vertex),
+                new ResourceLayoutElementDescription("UBO", ResourceKind.UniformBuffer, ShaderStages.Fragment) }));
+
             ShaderSetDescription depthShaders = new ShaderSetDescription(
                 new[] { vertexLayout },
                 factory.CreateFromSpirv(
                 new ShaderDescription(ShaderStages.Vertex, Utils.LoadShaderBytes(Utils.G, "Depth-vertex"), "main"),
                 new ShaderDescription(ShaderStages.Fragment, Utils.LoadShaderBytes(Utils.G, "Depth-fragment"), "main")));
 
+            materialCbs = new DeviceBuffer[_model.Materials.Count];
+            for (int idx = 0; idx < _model.Materials.Count; ++idx)
+            {
+                materialCbs[idx] = factory.CreateBuffer(new BufferDescription((uint)Marshal.SizeOf<Shaders.Depth.Material>(), BufferUsage.UniformBuffer));
+                Shaders.Depth.Material m = new Shaders.Depth.Material();
+                m.DiffuseColor = _model.Materials[idx].Color;
+                Utils.G.UpdateBuffer(materialCbs[idx], 0, ref m);
+            }
+
             sides = new Side[6];
             views = new TextureView[6];
             for (int i = 0; i < 6; ++i)
             {
-                sides[i] = new Side(i, factory, width, height, depthShaders, depthLayout);
-                views[i] = sides[i]._view;
+                sides[i] = new Side(i, factory, width, height, depthShaders, depthLayout, materialCbs);
+                views[i] = sides[i].View;
             }
-
-        }    
-
+        }
 
         public void DrawOffscreen()
         {
             for (int idx = 0; idx < 6; ++idx)
             {
-                sides[idx].Draw();
+                sides[idx].Prepare();
                 Utils.Cl.SetVertexBuffer(0, _model.VertexBuffer);
                 Utils.Cl.SetIndexBuffer(_model.IndexBuffer, IndexFormat.UInt32);
-                Utils.Cl.DrawIndexed(_model.IndexCount, 1, 0, 0, 0);                
+                for (int pIdx = 0; pIdx < _model.Parts.Count; ++pIdx)
+                {
+                    sides[idx].Draw(pIdx);
+                    var modelPart = _model.Parts[pIdx];
+                    Utils.Cl.DrawIndexed(modelPart.indexCount, 1, modelPart.indexBase, 0, 0);
+                }
+
+                sides[idx].BuildMips();
             }
         }
 
@@ -187,17 +244,21 @@ namespace Vox
         {
             for (int idx = 0; idx < 6; ++idx)
             {
-                sides[idx].CopyTexture();
+                sides[idx].CopyMips();
+                string voxfldr = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                    "Vox");
+                Directory.CreateDirectory(voxfldr);
+                sides[idx].WriteBmp(Path.Combine(voxfldr, $"side{idx}"));
             }
-            if (sides[0]._pixelData[0].a == 1)
+            if (sides[0]._pixelData[0][0].a == 1)
             {
-                Rgba32[][] buf = new Rgba32[][] { sides[0]._pixelData,
+                MMTex[] buf = new MMTex[] { sides[0]._pixelData,
                 sides[1]._pixelData,
                 sides[2]._pixelData,
                 sides[3]._pixelData,
                 sides[4]._pixelData,
                 sides[5]._pixelData };
-                Oct o = new Oct(minLod, maxLod, buf, (int)ModelVox.Size);
+                Oct o = new Oct(2, 10, buf, (int)ModelVox.Size);
                 List<Oct> leafs = new List<Oct>();
                 o.GetLeafNodes(leafs);
                 o.Collapse();

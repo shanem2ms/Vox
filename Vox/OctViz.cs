@@ -112,7 +112,7 @@ namespace Vox
             Vox.Shaders.Inst.Transform ui = new Vox.Shaders.Inst.Transform { LightPos = new Vector4(0, 0, 0, 1) };
             ui.Projection = c.ProjectionMatrix;
             ui.View = c.ViewMatrix;
-            ui.Model = Matrix4x4.CreateScale(10);
+            ui.Model = Matrix4x4.CreateTranslation(-0.5f, -0.5f, -0.5f) * Matrix4x4.CreateScale(10);
             Utils.G.UpdateBuffer(cbufferTransform, 0, ref ui);
         }
 

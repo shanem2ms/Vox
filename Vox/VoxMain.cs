@@ -5,10 +5,6 @@ using System.IO;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using Veldrid;
-using Veldrid.Sdl2;
-using Veldrid.SPIRV;
-using Veldrid.Utilities;
-
 namespace Vox
 {
     public class VoxMain : SampleApplication
@@ -25,7 +21,7 @@ namespace Vox
 
         public VoxMain(ApplicationWindow window) : base(window)
         {
-            _camera.Position = new Vector3(0, 1, -6f);
+            _camera.Position = new Vector3(0, 0, 22f);
         }
 
         protected override void CreateResources(ResourceFactory factory)
@@ -53,7 +49,7 @@ namespace Vox
                 GraphicsDevice.SwapchainFramebuffer.OutputDescription);
             _dbgPipeline = factory.CreateGraphicsPipeline(ref mirrorPD);
 
-            modelVox = new ModelVox(@"C:\Users\shane\Documents\text.ply");
+            modelVox = new ModelVox(@"C:\Users\shane\Downloads\tesla\model.dae");
 
 
             _dbgResourceSet = new ResourceSet[6];
@@ -65,7 +61,7 @@ namespace Vox
                 _dbgResourceSet[i] = factory.CreateResourceSet(new ResourceSetDescription(Utils.Blit.ResourceLayout,
                     modelVox.View[i],
                     GraphicsDevice.LinearSampler,
-                    blitTransform[i]));
+                    blitTransform[i]));                                   
             }
 
 
@@ -98,7 +94,7 @@ namespace Vox
             }
             else if (o == null)
             {
-                o = modelVox.BuildOct(7, 8);
+                o = modelVox.BuildOct(4, 8);
                 if (o != null)
                 {
                     VertexArray va = OctViz.BuildVA(o);

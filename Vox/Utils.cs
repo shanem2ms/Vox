@@ -6,7 +6,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using Veldrid;
 using Veldrid.SPIRV;
-
+using System.Runtime.InteropServices;
 
 namespace Vox
 {
@@ -30,6 +30,45 @@ namespace Vox
         }
     }
 
+    class MMTex
+    {
+        public Rgba32[][] data;
+        public MMTex(int levels)
+        {
+            data = new Rgba32[levels][];
+        }
+        public Rgba32[] this[int i]
+        {
+            get => data[i];
+            set { data[i] = value; }
+        }
+        public int Length => data.Length;
+
+        public void SaveTo(string file)
+        {
+            for (int i = 0; i < data.Length; ++i)
+            {
+                FileStream f = File.Create($"{file}_{i}.dat");
+                byte[] bytes = getBytes(data[i]);
+                f.Write(bytes, 0, bytes.Length);
+                f.Close();
+            }
+        }
+
+        byte[] getBytes<T>(T[] data)
+        {
+            int size = Marshal.SizeOf(typeof(T));
+            byte[] arr = new byte[size * data.Length];
+            IntPtr ptr = Marshal.AllocHGlobal(size);
+            for (int i = 0; i < data.Length; ++i)
+            {
+                Marshal.StructureToPtr(data[i], ptr, true);
+                Marshal.Copy(ptr, arr, i * size, size);
+            }
+            Marshal.FreeHGlobal(ptr);
+            return arr;
+        }
+    }
 
     class Utils
     {
@@ -43,6 +82,7 @@ namespace Vox
         public static IShader Phong;
         public static IShader Blit;
         public static IShader Depth;
+        public static IShader DepthDownScale;
         public static bool FlushAtEnd = false;
 
         public static void CreateGraphics(GraphicsDevice g, ResourceFactory factory, uint sw, uint sh)
@@ -54,7 +94,8 @@ namespace Vox
             ScreenWidth = sw;
             Phong = new PhongShader();
             Blit = new BlitShader();
-        }
+            DepthDownScale = new DepthDownScaleShader();
+    }
 
         public static float DegreesToRadians(float degrees)
         {
@@ -191,6 +232,33 @@ namespace Vox
                     Utils.Factory.CreateFromSpirv(
                     new ShaderDescription(ShaderStages.Vertex, Utils.LoadShaderBytes(Utils.G, "Depth-vertex"), "main"),
                     new ShaderDescription(ShaderStages.Fragment, Utils.LoadShaderBytes(Utils.G, "Depth-fragment"), "main")));
+        }
+
+        public ShaderSetDescription ShaderDesc { get; }
+
+        public ResourceLayout ResourceLayout { get; }
+
+        public VertexLayoutDescription VtxLayout { get; }
+    }
+
+
+    class DepthDownScaleShader : IShader
+    {
+        public DepthDownScaleShader()
+        {
+            VtxLayout = new VertexLayoutDescription(
+                new VertexElementDescription("Position", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float3),
+                new VertexElementDescription("UVW", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float3));
+
+            ResourceLayout = Utils.Factory.CreateResourceLayout(new ResourceLayoutDescription(
+                new ResourceLayoutElementDescription("Texture", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
+                new ResourceLayoutElementDescription("Sampler", ResourceKind.Sampler, ShaderStages.Fragment),
+                new ResourceLayoutElementDescription("UBO", ResourceKind.UniformBuffer, ShaderStages.Fragment)));
+
+            ShaderDesc = new ShaderSetDescription(new[] { VtxLayout },
+                    Utils.Factory.CreateFromSpirv(
+                    new ShaderDescription(ShaderStages.Vertex, Utils.LoadShaderBytes(Utils.G, "DepthDownScale-vertex"), "main"),
+                    new ShaderDescription(ShaderStages.Fragment, Utils.LoadShaderBytes(Utils.G, "DepthDownScale-fragment"), "main")));
         }
 
         public ShaderSetDescription ShaderDesc { get; }

@@ -20,6 +20,13 @@ namespace Vox.Shaders
 
         Transform t = new Transform();
 
+        public struct Material
+        {
+            public Vector4 DiffuseColor;
+        }
+
+        Material m = new Material();
+
         public struct VertexInput
         {
             [PositionSemantic] public Vector3 Position;
@@ -55,9 +62,9 @@ namespace Vox.Shaders
         public Vector4 FS(FragmentInput input)
         {
 
-            float v = ((input.Depth.X / input.Depth.Y) + 1) / 2;
-            float c = input.VtxColor.X + ShaderBuiltins.Floor(input.VtxColor.Y * 256) + ShaderBuiltins.Floor(input.VtxColor.Z * 256) * 256;
-            return new Vector4(v, 1, c, 1);
+            float v = (input.Depth.X / input.Depth.Y);
+            float c = m.DiffuseColor.X + ShaderBuiltins.Floor(m.DiffuseColor.Y * 256) + ShaderBuiltins.Floor(m.DiffuseColor.Z * 256) * 256;
+            return new Vector4(v, v, c, 1);
         }
     }
 }

@@ -5,7 +5,7 @@ using Veldrid;
 
 namespace SampleBase
 {
-    public class Camera
+    public class Camera2
     {
         private float _fov = 1f;
         private float _near = 1f;
@@ -28,7 +28,7 @@ namespace SampleBase
         public event Action<Matrix4x4> ProjectionChanged;
         public event Action<Matrix4x4> ViewChanged;
 
-        public Camera(float width, float height)
+        public Camera2(float width, float height)
         {
             _windowWidth = width;
             _windowHeight = height;
@@ -79,11 +79,11 @@ namespace SampleBase
             }
             if (InputTracker.GetKey(Key.Space))
             {
-                motionDir += Vector3.UnitY;
+                motionDir -= Vector3.UnitY;
             }
             if (InputTracker.GetKey(Key.ShiftLeft))
             {
-                motionDir += -Vector3.UnitY;
+                motionDir += Vector3.UnitY;
             }
 
             if (motionDir != Vector3.Zero)
@@ -149,6 +149,85 @@ namespace SampleBase
             CameraPosition_WorldSpace = _position,
             CameraLookDirection = _lookDirection
         };
+    }
+
+    public class Camera
+    {
+        private float _fov = 1f;
+        private float _near = 1f;
+        private float _far = 1000f;
+
+        private float _windowWidth;
+        private float _windowHeight;
+
+        public event Action<Matrix4x4> ProjectionChanged;
+        public event Action<Matrix4x4> ViewChanged;
+
+        private Vector2 _previousMousePos;
+        private Matrix4x4 _viewMatrix;
+        private Matrix4x4 _projectionMatrix;
+        public Matrix4x4 ViewMatrix => _viewMatrix;
+        public Matrix4x4 ProjectionMatrix => _projectionMatrix;
+        private Vector3 _position = new Vector3(0, 3, 0);
+
+        Quaternion curRot = Quaternion.Identity;
+        float dist = 12;
+
+        public Vector3 Position { get => _position; set { _position = value; UpdateViewMatrix(); } }
+
+        public float FarDistance { get => _far; set { _far = value; UpdatePerspectiveMatrix(); } }
+        public float FieldOfView => _fov;
+        public float NearDistance { get => _near; set { _near = value; UpdatePerspectiveMatrix(); } }
+
+        public float AspectRatio => _windowWidth / _windowHeight;
+
+        public Camera(float width, float height)
+        {
+            _windowWidth = width;
+            _windowHeight = height;
+            UpdatePerspectiveMatrix();
+            UpdateViewMatrix();
+        }
+
+        public void Update(float deltaSeconds)
+        {
+            Vector2 mouseDelta = InputTracker.MousePosition - _previousMousePos;
+            _previousMousePos = InputTracker.MousePosition;
+
+            if (InputTracker.GetMouseButton(MouseButton.Left))
+            {
+                curRot = curRot * Quaternion.CreateFromAxisAngle(Vector3.UnitY, mouseDelta.X * 0.02f) *
+                    Quaternion.CreateFromAxisAngle(Vector3.UnitX, mouseDelta.Y * 0.02f);
+            }
+            else if(InputTracker.GetMouseButton(MouseButton.Right))
+            {
+                float ld = MathF.Log2(dist);
+                ld += mouseDelta.Y * 0.002f;
+                dist = MathF.Pow(2, ld);
+            }
+
+            UpdateViewMatrix();
+        }
+
+        public void WindowResized(float width, float height)
+        {
+            _windowWidth = width;
+            _windowHeight = height;
+            UpdatePerspectiveMatrix();
+        }
+
+        private void UpdatePerspectiveMatrix()
+        {
+            _projectionMatrix = Matrix4x4.CreatePerspectiveFieldOfView(_fov, _windowWidth / _windowHeight, _near, _far);
+            ProjectionChanged?.Invoke(_projectionMatrix);
+        }
+
+        private void UpdateViewMatrix()
+        {
+            Vector3 dirVec = Vector3.Transform(Vector3.UnitZ, curRot);
+            Matrix4x4 invView = Matrix4x4.CreateFromQuaternion(curRot) * Matrix4x4.CreateTranslation(dirVec * dist);
+            Matrix4x4.Invert(invView, out this._viewMatrix);
+        }
     }
 
     [StructLayout(LayoutKind.Sequential)]

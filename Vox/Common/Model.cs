@@ -57,7 +57,7 @@ namespace Common
             // Load file
             AssimpContext assimpContext = new AssimpContext();
             Scene pScene = assimpContext.ImportFileFromStream(stream, DefaultPostProcessSteps, extension);
-
+            
             parts.Clear();
             parts.Count = (uint)pScene.Meshes.Count;
 
@@ -77,6 +77,38 @@ namespace Common
             VertexCount = 0;
             IndexCount = 0;
 
+            int floatsPerVertex = 0;
+            foreach (VertexElementSemantic component in elementSemantics)
+            {
+                switch (component)
+                {
+                    case VertexElementSemantic.Position:
+                        floatsPerVertex += 3;
+                        break;
+                    case VertexElementSemantic.Normal:
+                        floatsPerVertex += 3;
+                        break;
+                    case VertexElementSemantic.TextureCoordinate:
+                        floatsPerVertex += 2;
+                        break;
+                    case VertexElementSemantic.Color:
+                        floatsPerVertex += 3;
+                        break;
+                    default: throw new System.NotImplementedException();
+                };
+            }
+
+            if (pScene.HasMaterials)
+            {
+                materials.Resize((uint)pScene.MaterialCount);
+                for (int i = 0; i < pScene.MaterialCount; i++)
+                {
+                    var colAmb = pScene.Materials[i].ColorDiffuse;
+                    materials[i] = new Material() { Color = new Vector4(colAmb.R, colAmb.G, colAmb.B, colAmb.A) };
+                }
+            }
+
+            int vtxOffset = 0;
             // Load meshes
             for (int i = 0; i < pScene.Meshes.Count; i++)
             {
@@ -85,54 +117,19 @@ namespace Common
                 parts[i] = new ModelPart();
                 parts[i].vertexBase = VertexCount;
                 parts[i].indexBase = IndexCount;
+                parts[i].materialIdx = paiMesh.MaterialIndex;
 
                 VertexCount += (uint)paiMesh.VertexCount;
 
                 var pColor = pScene.Materials[paiMesh.MaterialIndex].ColorDiffuse;
 
                 Vector3D Zero3D = new Vector3D(0.0f, 0.0f, 0.0f);
-                Vector3 min = new Vector3(float.MaxValue);
-                Vector3 max = new Vector3(float.MinValue);
-                Vector3[] vtxarray = new Vector3[paiMesh.VertexCount];
+
+                if (!paiMesh.HasNormals)
+                    continue;
                 for (int j = 0; j < paiMesh.VertexCount; j++)
                 {
                     Vector3D pPos = paiMesh.Vertices[j];
-                    vtxarray[j] = new Vector3(pPos.X * scale.X + center.X,
-                        -pPos.Y * scale.Y + center.Y,
-                        pPos.Z * scale.Z + center.Z);
-
-                    max.X = Math.Max(vtxarray[j].X, max.X);
-                    max.Y = Math.Max(vtxarray[j].Y, max.Y);
-                    max.Z = Math.Max(vtxarray[j].Z, max.Z);
-
-                    min.X = Math.Min(vtxarray[j].X, min.X);
-                    min.Y = Math.Min(vtxarray[j].Y, min.Y);
-                    min.Z = Math.Min(vtxarray[j].Z, min.Z);
-                }
-
-                Vector3 scl = max - min;
-                Vector3 ori = (max + min) * 0.5f;
-                float md = Math.Max(scl.X, Math.Max(scl.Y, scl.Z));
-                md = 2.0f / md;
-
-                for (int j = 0; j < paiMesh.VertexCount; j++)
-                {
-                    Vector3 v = vtxarray[j];
-                    vtxarray[j] = (v - ori) * md;
-                    dim.Max.X = Math.Max(vtxarray[j].X, dim.Max.X);
-                    dim.Max.Y = Math.Max(vtxarray[j].Y, dim.Max.Y);
-                    dim.Max.Z = Math.Max(vtxarray[j].Z, dim.Max.Z);
-
-                    dim.Min.X = Math.Min(vtxarray[j].X, dim.Min.X);
-                    dim.Min.Y = Math.Min(vtxarray[j].Y, dim.Min.Y);
-                    dim.Min.Z = Math.Min(vtxarray[j].Z, dim.Min.Z);
-                }
-
-                dim.Size = dim.Max - dim.Min;
-
-                for (int j = 0; j < paiMesh.VertexCount; j++)
-                {
-                    Vector3 pPos = vtxarray[j];
                     Vector3D pNormal = paiMesh.Normals[j];
                     Vector3D pTexCoord = paiMesh.HasTextureCoords(0) ? paiMesh.TextureCoordinateChannels[0][j] : Zero3D;
                     Vector3D pTangent = paiMesh.HasTangentBasis ? paiMesh.Tangents[j] : Zero3D;
@@ -168,20 +165,45 @@ namespace Common
 
                 parts[i].vertexCount = (uint)paiMesh.VertexCount;
 
-                uint indexBase = indices.Count;
                 for (uint j = 0; j < paiMesh.FaceCount; j++)
                 {
                     Face Face = paiMesh.Faces[(int)j];
                     if (Face.IndexCount != 3)
                         continue;
-                    indices.Add(indexBase + (uint)Face.Indices[0]);
-                    indices.Add(indexBase + (uint)Face.Indices[1]);
-                    indices.Add(indexBase + (uint)Face.Indices[2]);
+                    indices.Add((uint)(vtxOffset + Face.Indices[0]));
+                    indices.Add((uint)(vtxOffset + Face.Indices[1]));
+                    indices.Add((uint)(vtxOffset + Face.Indices[2]));
                     parts[i].indexCount += 3;
                     IndexCount += 3;
                 }
+                
+                vtxOffset += paiMesh.VertexCount;
             }
 
+            Vector3 min = new Vector3(float.MaxValue);
+            Vector3 max = new Vector3(float.MinValue);
+            for (int j = 0; j < vertices.Count; j += floatsPerVertex)
+            {                
+                max.X = Math.Max(vertices[j], max.X);
+                max.Y = Math.Max(vertices[j + 1], max.Y);
+                max.Z = Math.Max(vertices[j + 2], max.Z);
+
+                min.X = Math.Min(vertices[j], min.X);
+                min.Y = Math.Min(vertices[j + 1], min.Y);
+                min.Z = Math.Min(vertices[j + 2], min.Z);
+            }
+
+            Vector3 scl = max - min;
+            Vector3 ori = (max + min) * 0.5f;
+            float md = Math.Max(scl.X, Math.Max(scl.Y, scl.Z));
+            md = 2.0f / md;
+
+            for (int j = 0; j < vertices.Count; j += floatsPerVertex)
+            {
+                vertices[j] = (vertices[j] - ori.X) * md;
+                vertices[j + 1] = (vertices[j + 1] - ori.Y) * md;
+                vertices[j + 2] = (vertices[j + 2] - ori.Z) * md;
+            }
 
             uint vBufferSize = (vertices.Count) * sizeof(float);
             uint iBufferSize = (indices.Count) * sizeof(uint);
@@ -199,9 +221,14 @@ namespace Common
             public uint vertexCount;
             public uint indexBase;
             public uint indexCount;
+            public int materialIdx;
         }
 
         RawList<ModelPart> parts = new RawList<ModelPart>();
+        public RawList<ModelPart> Parts => parts;
+
+        public RawList<Material> materials = new RawList<Material>();
+        public RawList<Material> Materials => materials;
 
         public struct Dimension
         {
@@ -209,6 +236,11 @@ namespace Common
             public Vector3 Max;
             public Vector3 Size;
             public Dimension(Vector3 min, Vector3 max) { Min = min; Max = max; Size = new Vector3(); }
+        }
+
+        public struct Material
+        {
+            public Vector4 Color;
         }
 
         public Dimension dim = new Dimension(new Vector3(float.MaxValue), new Vector3(float.MinValue));
