@@ -148,7 +148,7 @@ namespace Vox
             return false;
         }
 
-        public Oct(int minlevel, int maxlevel, MMTex[] sides, int size) : this(minlevel, maxlevel, new Loc(0, 0, 0, 0), sides, size)
+        public Oct(int minlevel, int maxlevel, MMTex[] sides, int size) : this(minlevel, maxlevel, new Loc(0, 0, 0, 0), sides, size, 7)
         { }
 
 
@@ -195,6 +195,18 @@ namespace Vox
             out c);
         }
 
+        HitResult IsHitZ(Vector3[] mm, MMTex[] sides, int lod, out float c)
+        {
+            return IsHit(
+                    new Vector2((mm[0].Z + mm[1].Z) * 0.5f,
+                    (mm[0].Y + mm[1].Y) * 0.5f),
+            1 - mm[1].X, 1 - mm[0].X,
+            sides[4],
+            sides[5],
+            lod,
+            out c);
+        }
+
         HitResult IsHit(Vector2 v, float nearz, float farz, MMTex near, MMTex far, int lod, out float c)
         {
             int size = 1 << lod;
@@ -229,7 +241,7 @@ namespace Vox
             return new Vector3(c % 1, (c / 256) % 1, (c / (256 * 256)));
         }
 
-        Oct(int minlevel, int maxlevel, Loc cl, MMTex[] sides, int size)
+        Oct(int minlevel, int maxlevel, Loc cl, MMTex[] sides, int size, int xyzmask)
         {
             l = cl;
 
@@ -239,33 +251,41 @@ namespace Vox
                 n = new Oct[8];
                 for (int i = 0; i < 8; ++i)
                 {
-                    n[i] = new Oct(minlevel, maxlevel, l[i], sides, size);
+                    n[i] = new Oct(minlevel, maxlevel, l[i], sides, size, xyzmask);
                 }
             }
             else
             {
+                bool skipx = (xyzmask & 1) == 0;
+                bool skipy = (xyzmask & 2) == 0;
+                bool skipz = (xyzmask & 4) == 0;
                 float cx = 0;
                 float cy = 0;
-                HitResult hrX = IsHitX(l.GetBox(), sides, l.lev, out cx);
-                HitResult hrY = IsHitY(l.GetBox(), sides, l.lev, out cy);
-                if ((hrX == HitResult.eAllInside && hrY == HitResult.eAllInside)
-                    || (hrX == HitResult.ePartial && hrY == HitResult.ePartial && l.lev >= maxlevel))
+                float cz = 0;
+                HitResult hrX = skipx ? HitResult.eAllInside : IsHitX(l.GetBox(), sides, l.lev, out cx);
+                HitResult hrY = skipy ? HitResult.eAllInside : IsHitY(l.GetBox(), sides, l.lev, out cy);
+                HitResult hrZ = skipz ? HitResult.eAllInside : IsHitZ(l.GetBox(), sides, l.lev, out cz);                      
+                if ((hrX == HitResult.eAllInside && hrY == HitResult.eAllInside && hrZ == HitResult.eAllInside)
+                    || (l.lev >= maxlevel && hrX != HitResult.eAllOutside && hrY != HitResult.eAllOutside &&
+                    hrZ != HitResult.eAllOutside))
                 {
                     Vector3 c = Vector3.Zero;
                     if (cx > 0)
                         c = Decode(cx);
                     if (cy > 0)
                         c = Decode(cy);
+                    if (cz > 0)
+                        c = Decode(cz);
                     this.color = c;
                     this.visible = true;
                 }
-                else if ((hrX == HitResult.ePartial || hrY == HitResult.ePartial) &&
+                else if ((hrX == HitResult.ePartial || hrY == HitResult.ePartial || hrZ == HitResult.ePartial) &&
                     l.lev < maxlevel)
                 {
                     n = new Oct[8];
                     for (int i = 0; i < 8; ++i)
                     {
-                        n[i] = new Oct(minlevel, maxlevel, l[i], sides, size);
+                        n[i] = new Oct(minlevel, maxlevel, l[i], sides, size, xyzmask);
                     }
                 } 
             }

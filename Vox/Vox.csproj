@@ -4,11 +4,6 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net5.0</TargetFramework>
     <Platforms>x64</Platforms>
-    <ShaderOutputPath>$(BaseIntermediateOutputPath)Shaders</ShaderOutputPath>
-    <!-- In Debug mode, preserve all of the shader code, not just the compiled bytecode. -->
-    <ListAllShaderPaths Condition="'$(Configuration)' == 'Debug'">true</ListAllShaderPaths>
-    <LangVersion>Latest</LangVersion>
-    <ShaderContentIncludePath>Shaders</ShaderContentIncludePath>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -25,21 +20,13 @@
     </EmbeddedResource>
   </ItemGroup>
 
+
   <ItemGroup>
-    <PackageReference Include="ShaderGen" Version="1.2.0-beta3" />
-    <PackageReference Include="ShaderGen.Build" Version="1.2.0-beta3" />
-    <PackageReference Include="ShaderGen.Primitives" Version="1.2.0-beta3" />
     <PackageReference Include="System.Drawing.Common" Version="5.0.1" />
     <PackageReference Include="Veldrid.SDL2" Version="4.8.0" />
     <PackageReference Include="Veldrid.Spirv" Version="1.0.13" />
     <PackageReference Include="AssimpNet" Version="5.0.0-beta1" />
     <PackageReference Include="Veldrid.StartupUtilities" Version="4.8.0" />
     <PackageReference Include="Veldrid.Utilities" Version="4.8.0" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <EmbeddedResource Update="Shaders\DepthDownScale.cs">
-      <LogicalName>%(Filename)%(Extension)</LogicalName>
-    </EmbeddedResource>
   </ItemGroup>
 </Project>
