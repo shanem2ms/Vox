@@ -49,7 +49,7 @@ namespace Vox
                 GraphicsDevice.SwapchainFramebuffer.OutputDescription);
             _dbgPipeline = factory.CreateGraphicsPipeline(ref mirrorPD);
 
-            modelVox = new ModelVox(@"C:\Users\shane\Downloads\tesla\model.dae");
+            modelVox = new ModelVox(@"tesla.dae");
 
 
             _dbgResourceSet = new ResourceSet[6];
