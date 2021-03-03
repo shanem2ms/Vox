@@ -21,7 +21,58 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Remove="Shaders\Blit-fragment.glsl" />
+    <EmbeddedResource Remove="Shaders\Blit-vertex.glsl" />
     <EmbeddedResource Remove="Shaders\CBuffers.cs" />
+    <EmbeddedResource Remove="Shaders\Depth-fragment.glsl" />
+    <EmbeddedResource Remove="Shaders\Depth-vertex.glsl" />
+    <EmbeddedResource Remove="Shaders\DepthDownScale-fragment.glsl" />
+    <EmbeddedResource Remove="Shaders\DepthDownScale-vertex.glsl" />
+    <EmbeddedResource Remove="Shaders\Inst-fragment.glsl" />
+    <EmbeddedResource Remove="Shaders\Inst-vertex.glsl" />
+    <EmbeddedResource Remove="Shaders\Mirror-fragment.glsl" />
+    <EmbeddedResource Remove="Shaders\Mirror-vertex.glsl" />
+    <EmbeddedResource Remove="Shaders\Phong-fragment.glsl" />
+    <EmbeddedResource Remove="Shaders\Phong-vertex.glsl" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Shaders\Blit-fragment.glsl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Shaders\Blit-vertex.glsl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Shaders\Depth-fragment.glsl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Shaders\Depth-vertex.glsl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Shaders\DepthDownScale-fragment.glsl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Shaders\DepthDownScale-vertex.glsl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Shaders\Inst-fragment.glsl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Shaders\Inst-vertex.glsl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Shaders\Mirror-fragment.glsl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Shaders\Mirror-vertex.glsl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Shaders\Phong-fragment.glsl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Shaders\Phong-vertex.glsl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 
@@ -36,42 +87,9 @@
 
 
   <ItemGroup>
-    <EmbeddedResource Update="Shaders\Blit-fragment.glsl">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Update="Shaders\Blit-vertex.glsl">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Update="Shaders\Depth-fragment.glsl">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Update="Shaders\Depth-vertex.glsl">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Update="Shaders\DepthDownScale-fragment.glsl">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Update="Shaders\DepthDownScale-vertex.glsl">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Update="Shaders\Inst-fragment.glsl">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Update="Shaders\Inst-vertex.glsl">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Update="Shaders\Mirror-fragment.glsl">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Update="Shaders\Mirror-vertex.glsl">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Update="Shaders\Phong-fragment.glsl">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Update="Shaders\Phong-vertex.glsl">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </EmbeddedResource>
+    <Compile Update="DownScale.cs">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Compile>
   </ItemGroup>
 
 
