@@ -105,27 +105,7 @@ namespace Vox
         public static byte[] LoadShaderBytes(GraphicsDevice _gd, string name)
         {
             string extension;
-            switch (_gd.BackendType)
-            {
-                case GraphicsBackend.Direct3D11:
-                    extension = "hlsl";
-                    break;
-                case GraphicsBackend.Vulkan:
-                    extension = "450.glsl";
-                    break;
-                case GraphicsBackend.OpenGL:
-                    extension = "330.glsl";
-                    break;
-                case GraphicsBackend.Metal:
-                    extension = "metallib";
-                    break;
-                case GraphicsBackend.OpenGLES:
-                    extension = "300.glsles";
-                    break;
-                default: throw new InvalidOperationException();
-            }
-
-            extension = "450.glsl";
+            extension = "glsl";
             return File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Shaders", $"{name}.{extension}"));
         }
     }
