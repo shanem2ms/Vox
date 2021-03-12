@@ -121,7 +121,7 @@ namespace Vox
             int baseLod = sides[0].baseLod;
             int lodLevels = sides[0].baseLod + sides[0].Length;
             uint curIdx = 1;
-            for (int lod = 2; lod < (lodLevels - 1); ++lod)
+            for (int lod = 2; lod < lodLevels; ++lod)
             {
                 uint buildTo = nextWriteIdx;
                 Rgba32[][] sidesLod = lod >= baseLod ? sides.Select(mm => mm.data[lod - baseLod]).ToArray() : null;
@@ -137,7 +137,7 @@ namespace Vox
                             return;
                         while (readIdx < buildTo)
                         {
-                            this[readIdx].Build(this, sidesLod, size, 7, lod == (lodLevels - 2));
+                            this[readIdx].Build(this, sidesLod, size, 7, lod == (lodLevels - 1));
                             readIdx = Interlocked.Increment(ref nextReadIdx) - 1;
                         }
                     });
@@ -150,7 +150,6 @@ namespace Vox
                     threads[idx].Join();
                 }
                 curIdx = buildTo;
-                System.Diagnostics.Debug.WriteLine($"{lod}: {nextWriteIdx}");
             }                                             
         }
     }
