@@ -150,6 +150,7 @@ namespace Vox
                     threads[idx].Join();
                 }
                 curIdx = buildTo;
+                System.Diagnostics.Debug.WriteLine($"{lod}: {nextWriteIdx}");
             }                                             
         }
     }
@@ -167,12 +168,14 @@ namespace Vox
         public Loc l;
         public Vector3 color = Vector3.One;
         public uint[] n;
-        public bool visible = true;
+        public bool isleaf = false;
+        public bool visible = false;
 
         public Oct(Loc loc) { l = loc; }
 
         public void Build(OctBuffer buf, Rgba32[][] sides, int size, int xyzmask, bool lastLevel)
         {
+            if (isleaf) return;
             this.visible = false;
             if (sides == null)
             {
@@ -210,6 +213,8 @@ namespace Vox
                             c = Decode(cz);
                         n[i] = buf.CreateOct(cl);
                         buf[n[i]].color = c;
+                        buf[n[i]].isleaf = true;
+                        buf[n[i]].visible = true;
                     }
                     else if ((hrX == HitResult.ePartial || hrY == HitResult.ePartial || hrZ == HitResult.ePartial) &&
                         !lastLevel)
@@ -346,7 +351,7 @@ namespace Vox
 
         public void GetLeafNodes(OctBuffer buf, List<Oct> leafs)
         {
-            if (this.n == null)
+            if (this.isleaf)
             {
                 if (this.visible) leafs.Add(this);
             }
