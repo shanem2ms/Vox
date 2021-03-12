@@ -33,7 +33,9 @@ namespace Vox
     class MMTex
     {
         public Rgba32[][] data;
-        public MMTex(int levels)
+        public int baseLod = 0;
+
+        public MMTex(int baseLod, int levels)
         {
             data = new Rgba32[levels][];
         }

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Threading;
 
 namespace Vox
 {    
@@ -11,7 +12,6 @@ namespace Vox
         public long x;
         public long y;
         public long z;
-
 
         public Loc(int l, long _x, long _y, long _z)
         {
@@ -81,6 +81,79 @@ namespace Vox
         }
     }
 
+    class OctBuffer
+    {
+        public uint nextWriteIdx;
+        const int stgSize = 1 << 20;
+        const int maxstg = 32;
+        public Oct[][] nodes = new Oct[maxstg][];
+
+        public OctBuffer()
+        {
+            for (int idx = 0; idx < maxstg; ++idx)
+                nodes[idx] = new Oct[stgSize];
+        }
+            
+        public uint CreateOct(Loc loc)
+        {
+            uint idx = Interlocked.Increment(ref nextWriteIdx) - 1;
+
+            uint storageIdx = idx / stgSize;
+            uint nodeidx = idx % stgSize;
+            nodes[storageIdx][nodeidx] = new Oct(loc);
+            return idx;
+        }
+          
+        public Oct this[uint idx] => nodes[idx / stgSize][idx % stgSize];
+
+        Oct Top => nodes[0][0];
+
+        public void GetLeafNodes(List<Oct> leafs)
+        {
+            Top.GetLeafNodes(this, leafs);
+        }
+
+        public void Build(MMTex[] sides, int size)
+        {
+            CreateOct(new Loc(0, 0, 0, 0));
+            this[0].Build(this, null, size, 7, false);
+
+            int baseLod = sides[0].baseLod;
+            int lodLevels = sides[0].baseLod + sides[0].Length;
+            uint curIdx = 1;
+            for (int lod = 2; lod < (lodLevels - 1); ++lod)
+            {
+                uint buildTo = nextWriteIdx;
+                Rgba32[][] sidesLod = lod >= baseLod ? sides.Select(mm => mm.data[lod - baseLod]).ToArray() : null;
+
+                Thread[] threads = new Thread[28];
+                uint nextReadIdx = curIdx;
+                for (int idx = 0; idx < threads.Length; ++idx)
+                {
+                    threads[idx] = new Thread(() =>
+                    {
+                        uint readIdx = Interlocked.Increment(ref nextReadIdx) - 1;
+                        if (readIdx >= buildTo)
+                            return;
+                        while (readIdx < buildTo)
+                        {
+                            this[readIdx].Build(this, sidesLod, size, 7, lod == (lodLevels - 2));
+                            readIdx = Interlocked.Increment(ref nextReadIdx) - 1;
+                        }
+                    });
+
+                    threads[idx].Start();
+                }
+
+                for (int idx = 0; idx < threads.Length; ++idx)
+                {
+                    threads[idx].Join();
+                }
+                curIdx = buildTo;
+            }                                             
+        }
+    }
+
     class Oct : IComparable<Oct>
     {
 
@@ -93,30 +166,62 @@ namespace Vox
 
         public Loc l;
         public Vector3 color = Vector3.One;
-        public Oct[] n;
+        public uint[] n;
         public bool visible = true;
 
-        public Oct(int buildlevels) : this(buildlevels, new Loc(0, 0, 0, 0))
-        { }
+        public Oct(Loc loc) { l = loc; }
 
-        Oct(int buildlevels, Loc cl)
+        public void Build(OctBuffer buf, Rgba32[][] sides, int size, int xyzmask, bool lastLevel)
         {
-            l = cl;
-
-            if (l.lev < buildlevels)
+            this.visible = false;
+            if (sides == null)
             {
-                n = new Oct[8];
+                n = new uint[8];
                 for (int i = 0; i < 8; ++i)
                 {
-                    n[i] = new Oct(buildlevels, l[i]);
+                    n[i] = buf.CreateOct(l[i]);
                 }
+            }
+            else
+            {
+                n = new uint[8];
+                for (int i = 0; i < 8; ++i)
+                {
+                    Loc cl = l[i];
+                    bool skipx = (xyzmask & 1) == 0;
+                    bool skipy = (xyzmask & 2) == 0;
+                    bool skipz = (xyzmask & 4) == 0;
+                    float cx = 0;
+                    float cy = 0;
+                    float cz = 0;
+                    HitResult hrX = skipx ? HitResult.eAllInside : IsHitX(cl.GetBox(), sides, cl.lev, out cx);
+                    HitResult hrY = skipy ? HitResult.eAllInside : IsHitY(cl.GetBox(), sides, cl.lev, out cy);
+                    HitResult hrZ = skipz ? HitResult.eAllInside : IsHitZ(cl.GetBox(), sides, cl.lev, out cz);
+                    if ((hrX == HitResult.eAllInside && hrY == HitResult.eAllInside && hrZ == HitResult.eAllInside)
+                        || (lastLevel && hrX != HitResult.eAllOutside && hrY != HitResult.eAllOutside &&
+                        hrZ != HitResult.eAllOutside))
+                    {
+                        Vector3 c = Vector3.Zero;
+                        if (cx > 0)
+                            c = Decode(cx);
+                        if (cy > 0)
+                            c = Decode(cy);
+                        if (cz > 0)
+                            c = Decode(cz);
+                        n[i] = buf.CreateOct(cl);
+                        buf[n[i]].color = c;
+                    }
+                    else if ((hrX == HitResult.ePartial || hrY == HitResult.ePartial || hrZ == HitResult.ePartial) &&
+                        !lastLevel)
+                    {
+                        n[i] = buf.CreateOct(cl);
+                    }
+                }                                
             }
         }
 
-        public static List<Loc> clocs = new List<Loc>();
-        public bool Collapse()
+        public bool Collapse(OctBuffer buf)
         {
-            clocs.Add(l);
             if (n == null)
                 return true;
 
@@ -124,18 +229,19 @@ namespace Vox
             bool cancollapse = true;
             for (int i = 0; i < 8; ++i)
             {
-                cancollapse &= n[i].Collapse();
-                visiblecnt += n[i].visible ? 1 : 0;
+                cancollapse &= buf[n[i]].Collapse(buf);
+                visiblecnt += buf[n[i]].visible ? 1 : 0;
             }
 
             if (cancollapse && (visiblecnt == 0 || visiblecnt == 8))
-            {
+            {                                                                                                                                                                                 
+
                 if (visiblecnt == 8)
                 {
                     Vector3 nColor = Vector3.Zero;
                     for (int i = 0; i < 8; ++i)
                     {
-                        nColor += n[i].color;
+                        nColor += buf[n[i]].color;
                     }
 
                     this.color = nColor / 8.0f;
@@ -148,11 +254,9 @@ namespace Vox
             return false;
         }
 
-        public Oct(int minlevel, int maxlevel, MMTex[] sides, int size) : this(minlevel, maxlevel, new Loc(0, 0, 0, 0), sides, size, 7)
-        { }
 
 
-        public Oct GetAtLoc(Loc _l)
+        public Oct GetAtLoc(OctBuffer buf, Loc _l)
         {
             if (_l.lev == l.lev)
                 return this;
@@ -161,17 +265,17 @@ namespace Vox
                 return null;
 
             Loc p = _l.GetParentAtLevel(l.lev + 1);
-            foreach (Oct o in n)
+            foreach (uint o in n)
             {
-                if (o.l.Equals(p))
-                    return o.GetAtLoc(_l);
+                if (buf[o].l.Equals(p))
+                    return buf[o].GetAtLoc(buf, _l);
             }
 
             return null;
         }
 
 
-        HitResult IsHitX(Vector3[] mm, MMTex[] sides, int lod, out float c)
+        HitResult IsHitX(Vector3[] mm, Rgba32[][] sides, int lod, out float c)
         {
             return IsHit(
                     new Vector2((mm[0].X + mm[1].X) * 0.5f,
@@ -183,7 +287,7 @@ namespace Vox
             out c);
         }
 
-        HitResult IsHitY(Vector3[] mm, MMTex[] sides, int lod, out float c)
+        HitResult IsHitY(Vector3[] mm, Rgba32[][] sides, int lod, out float c)
         {
             return IsHit(
                     new Vector2((mm[0].X + mm[1].X) * 0.5f,
@@ -195,7 +299,7 @@ namespace Vox
             out c);
         }
 
-        HitResult IsHitZ(Vector3[] mm, MMTex[] sides, int lod, out float c)
+        HitResult IsHitZ(Vector3[] mm, Rgba32[][] sides, int lod, out float c)
         {
             return IsHit(
                     new Vector2((mm[0].Z + mm[1].Z) * 0.5f,
@@ -207,16 +311,15 @@ namespace Vox
             out c);
         }
 
-        HitResult IsHit(Vector2 v, float nearz, float farz, MMTex near, MMTex far, int lod, out float c)
+        HitResult IsHit(Vector2 v, float nearz, float farz, Rgba32[] near, Rgba32[] far, int lod, out float c)
         {
             int size = 1 << lod;
-            int mip = lod - 2;
             int w = (int)((v.X) * (size - 1));
             int h = (int)((v.Y) * (size - 1));
-            float nearmax = near[mip][h * size + w].r;
-            float nearmin = near[mip][h * size + w].g;
-            float farmax = far[mip][h * size + w].r;
-            float farmin = far[mip][h * size + w].g;
+            float nearmax = near[h * size + w].r;
+            float nearmin = near[h * size + w].g;
+            float farmax = far[h * size + w].r;
+            float farmin = far[h * size + w].g;
             if (nearz >= farmax ||
                 farz <= nearmin)
             {
@@ -224,9 +327,9 @@ namespace Vox
                 return HitResult.eAllOutside;
             }
 
-            float a0 = near[mip][h * size + w].b;
-            c = a0 > 0 ? near[mip][h * size + w].b :
-                far[mip][h * size + w].b;
+            float a0 = near[h * size + w].b;
+            c = a0 > 0 ? near[h * size + w].b :                                                                                                                    
+                far[h * size + w].b;
             if (nearz > nearmax && 
                 farz < farmin)
             {
@@ -241,57 +344,7 @@ namespace Vox
             return new Vector3(c % 1, (c / 256) % 1, (c / (256 * 256)));
         }
 
-        Oct(int minlevel, int maxlevel, Loc cl, MMTex[] sides, int size, int xyzmask)
-        {
-            l = cl;
-
-            this.visible = false;
-            if (l.lev < minlevel)
-            {
-                n = new Oct[8];
-                for (int i = 0; i < 8; ++i)
-                {
-                    n[i] = new Oct(minlevel, maxlevel, l[i], sides, size, xyzmask);
-                }
-            }
-            else
-            {
-                bool skipx = (xyzmask & 1) == 0;
-                bool skipy = (xyzmask & 2) == 0;
-                bool skipz = (xyzmask & 4) == 0;
-                float cx = 0;
-                float cy = 0;
-                float cz = 0;
-                HitResult hrX = skipx ? HitResult.eAllInside : IsHitX(l.GetBox(), sides, l.lev, out cx);
-                HitResult hrY = skipy ? HitResult.eAllInside : IsHitY(l.GetBox(), sides, l.lev, out cy);
-                HitResult hrZ = skipz ? HitResult.eAllInside : IsHitZ(l.GetBox(), sides, l.lev, out cz);                      
-                if ((hrX == HitResult.eAllInside && hrY == HitResult.eAllInside && hrZ == HitResult.eAllInside)
-                    || (l.lev >= maxlevel && hrX != HitResult.eAllOutside && hrY != HitResult.eAllOutside &&
-                    hrZ != HitResult.eAllOutside))
-                {
-                    Vector3 c = Vector3.Zero;
-                    if (cx > 0)
-                        c = Decode(cx);
-                    if (cy > 0)
-                        c = Decode(cy);
-                    if (cz > 0)
-                        c = Decode(cz);
-                    this.color = c;
-                    this.visible = true;
-                }
-                else if ((hrX == HitResult.ePartial || hrY == HitResult.ePartial || hrZ == HitResult.ePartial) &&
-                    l.lev < maxlevel)
-                {
-                    n = new Oct[8];
-                    for (int i = 0; i < 8; ++i)
-                    {
-                        n[i] = new Oct(minlevel, maxlevel, l[i], sides, size, xyzmask);
-                    }
-                } 
-            }
-        }
-
-        public void GetLeafNodes(List<Oct> leafs)
+        public void GetLeafNodes(OctBuffer buf, List<Oct> leafs)
         {
             if (this.n == null)
             {
@@ -299,8 +352,11 @@ namespace Vox
             }
             else
             {
-                foreach (var c in n)
-                { c.GetLeafNodes(leafs); }
+                foreach (uint idx in n)
+                {
+                    if (idx == 0)
+                        continue;
+                    buf[idx].GetLeafNodes(buf, leafs); }
             }
         }
 
@@ -317,7 +373,7 @@ namespace Vox
 
     static class OctViz
     {
-        public static VertexArray BuildVA(Oct topNode)
+        public static VertexArray BuildVA(OctBuffer buf)
         {
             uint[] indices = new uint[_Cube.Length];
             Vector3[] texCoords = new Vector3[_Cube.Length];
@@ -365,7 +421,7 @@ namespace Vox
             }
 
             List<Oct> leafs = new List<Oct>();
-            topNode.GetLeafNodes(leafs);
+            buf.GetLeafNodes(leafs);
             leafs.Sort();
             Vector4[] ind0 = leafs.Select(l => l.l.GetPosScale()).ToArray();
             Vector4[] ind1 = leafs.Select(l => new Vector4(l.color, 0)).ToArray();

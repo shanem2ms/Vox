@@ -51,7 +51,6 @@ namespace Vox
 
             modelVox = new ModelVox(@"tesla.dae");
 
-
             _dbgResourceSet = new ResourceSet[6];
             blitTransform = new DeviceBuffer[6];
             for (int i = 0; i < 6; ++i)
@@ -82,7 +81,7 @@ namespace Vox
             GraphicsDevice.SwapBuffers();
         }
 
-        Oct o = null;
+        OctBuffer o = null;
 
         static int frame = 0;
         private void DrawMain()

@@ -1,5 +1,6 @@
 ﻿using Common;
 using System;
+using System.Linq;
 using System.IO;
 using System.Numerics;
 using Veldrid;
@@ -25,7 +26,7 @@ namespace Vox
             DownScale[] _mips;
             Texture[] _staging;
 
-            public TextureView View => _mips[_mips.Length - 3].View;
+            public TextureView[] View => _mips.Select(m => m.View).ToArray();
 
             int idx;
 
@@ -93,7 +94,8 @@ namespace Vox
             {
                 if (_pixelData == null)
                 {
-                    _pixelData = new MMTex(_mips.Length + 1);
+                    _pixelData = new MMTex(2, _mips.Length + 1);
+                    _pixelData.baseLod = 2;
                     _staging = new Texture[_mips.Length + 1];
                     for (int idx = 0; idx < _pixelData.Length; ++idx)
                     {
@@ -111,6 +113,7 @@ namespace Vox
                     CopyTexture(_staging[idx], _pixelData[_pixelData.Length - idx - 1]);
                 }
             }
+
             void CopyTexture(Texture tex, Rgba32[] pixelData)                 
             {
                 MappedResourceView<Rgba32> map = Utils.G.Map<Rgba32>(tex, MapMode.Read);
@@ -164,6 +167,7 @@ namespace Vox
         public TextureView []View => views;
         static uint Size = 1024;
         DeviceBuffer[] materialCbs;
+        ComputeOct computeOct = new ComputeOct();
 
         public ModelVox(string model)
         {
@@ -184,10 +188,8 @@ namespace Vox
 
         }
 
-
         void CreateResource(ResourceFactory factory, uint width, uint height)
         {
-
             VertexLayoutDescription vertexLayout = new VertexLayoutDescription(
                          new VertexElementDescription("Position", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float3),
                          new VertexElementDescription("UV", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float2),
@@ -218,8 +220,10 @@ namespace Vox
             for (int i = 0; i < 6; ++i)
             {
                 sides[i] = new Side(i, factory, width, height, depthShaders, depthLayout, materialCbs);
-                views[i] = sides[i].View;
+                views[i] = sides[i].View[0];
             }
+
+            computeOct.CreateResources(factory, sides.Select(s => s.View).ToArray());
         }
 
         public void DrawOffscreen()
@@ -240,32 +244,23 @@ namespace Vox
             }
         }
 
-        public Oct BuildOct(int minLod, int maxLod)
+        public OctBuffer BuildOct(int minLod, int maxLod)
         {
-            for (int idx = 0; idx < 6; ++idx)
-            {
-                sides[idx].CopyMips();
-                string voxfldr = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                    "Vox");
-                Directory.CreateDirectory(voxfldr);
-                sides[idx].WriteBmp(Path.Combine(voxfldr, $"side{idx}"));
-            }
+            for (int i = 0; i < 6; ++i)
+                sides[i].CopyMips();
+            computeOct.RunCompute();
             if (sides[0]._pixelData[0][0].a == 1)
             {
-                MMTex[] buf = new MMTex[] { sides[0]._pixelData,
+                MMTex[] mmtex = new MMTex[] { sides[0]._pixelData,
                 sides[1]._pixelData,
                 sides[2]._pixelData,
                 sides[3]._pixelData,
                 sides[4]._pixelData,
                 sides[5]._pixelData };
-                Oct o = new Oct(2, 10, buf, (int)ModelVox.Size);
-                List<Oct> leafs = new List<Oct>();
-                o.GetLeafNodes(leafs);
-                o.Collapse();
-                Oct.clocs.Sort();
-                leafs.Clear();
-                o.GetLeafNodes(leafs);
-                return o;
+                OctBuffer buf = new OctBuffer();
+                buf.Build(mmtex, (int)ModelVox.Size);
+                
+                return buf;
             }
             else
                 return null;

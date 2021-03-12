@@ -24,6 +24,7 @@
     <EmbeddedResource Remove="Shaders\Blit-fragment.glsl" />
     <EmbeddedResource Remove="Shaders\Blit-vertex.glsl" />
     <EmbeddedResource Remove="Shaders\CBuffers.cs" />
+    <EmbeddedResource Remove="Shaders\Compute.glsl" />
     <EmbeddedResource Remove="Shaders\Depth-fragment.glsl" />
     <EmbeddedResource Remove="Shaders\Depth-vertex.glsl" />
     <EmbeddedResource Remove="Shaders\DepthDownScale-fragment.glsl" />
@@ -37,10 +38,17 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Remove="Shaders\Compute.glsl" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="Shaders\Blit-fragment.glsl">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="Shaders\Blit-vertex.glsl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Shaders\Compute.glsl">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="Shaders\Depth-fragment.glsl">
