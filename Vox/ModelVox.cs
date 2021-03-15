@@ -114,6 +114,12 @@ namespace Vox
                 }
             }
 
+            public int LodCnt => _mips.Length + 1;
+            public Texture TexAtLod(int lod)
+            {
+                return lod == 0 ? _color : _mips[lod - 1].OutTexture;
+            }
+
             void CopyTexture(Texture tex, Rgba32[] pixelData)                 
             {
                 MappedResourceView<Rgba32> map = Utils.G.Map<Rgba32>(tex, MapMode.Read);
@@ -244,11 +250,13 @@ namespace Vox
             }
         }
 
-        public OctBuffer BuildOct(int minLod, int maxLod)
+        public OctBuffer BuildOct()
         {
+            int lodCnt = sides[0].LodCnt;
+            computeOct.RunCompute();
+            /*
             for (int i = 0; i < 6; ++i)
                 sides[i].CopyMips();
-            computeOct.RunCompute();
             if (sides[0]._pixelData[0][0].a == 1)
             {
                 MMTex[] mmtex = new MMTex[] { sides[0]._pixelData,
@@ -258,11 +266,11 @@ namespace Vox
                 sides[4]._pixelData,
                 sides[5]._pixelData };
                 OctBuffer buf = new OctBuffer();
-                buf.Build(mmtex, (int)ModelVox.Size);
+                buf.Build(mmtex);
                 
                 return buf;
             }
-            else
+            else*/
                 return null;
         }
     }

@@ -113,10 +113,10 @@ namespace Vox
             Top.GetLeafNodes(this, leafs);
         }
 
-        public void Build(MMTex[] sides, int size)
+        public void Build(MMTex[] sides)
         {
             CreateOct(new Loc(0, 0, 0, 0));
-            this[0].Build(this, null, size, 7, false);
+            this[0].Build(this, null, 7, false);
 
             int baseLod = sides[0].baseLod;
             int lodLevels = sides[0].baseLod + sides[0].Length;
@@ -137,7 +137,7 @@ namespace Vox
                             return;
                         while (readIdx < buildTo)
                         {
-                            this[readIdx].Build(this, sidesLod, size, 7, lod == (lodLevels - 1));
+                            this[readIdx].Build(this, sidesLod, 7, lod == (lodLevels - 1));
                             readIdx = Interlocked.Increment(ref nextReadIdx) - 1;
                         }
                     });
@@ -172,7 +172,7 @@ namespace Vox
 
         public Oct(Loc loc) { l = loc; }
 
-        public void Build(OctBuffer buf, Rgba32[][] sides, int size, int xyzmask, bool lastLevel)
+        public void Build(OctBuffer buf, Rgba32[][] sides, int xyzmask, bool lastLevel)
         {
             if (isleaf) return;
             this.visible = false;

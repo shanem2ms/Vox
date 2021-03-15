@@ -19,18 +19,27 @@ namespace Vox
         private Shader _computeShader;
         private Pipeline _computePipeline;
         private ResourceSet _storageResourceSet;
-        private ResourceSet _imgResourceSet;
+        private ResourceSet []_imgResourceSets;
         private bool _initialized;
         private TextureView[][] sides;
 
+        [StructLayout(LayoutKind.Sequential)]
+        struct OctLoc
+        {
+            public uint lev;
+            public uint x;
+            public uint y;
+            public uint z;
+        }
 
         [StructLayout(LayoutKind.Sequential)]
         struct OctNode
         {
+            OctLoc loc;
             [MarshalAs(UnmanagedType.ByValArray, SizeConst = 8)]
             uint[] nodes;
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 32)]
-            byte[] data;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
+            uint[] data;
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -79,17 +88,20 @@ namespace Vox
                 1, 1, 1);
             _computePipeline = factory.CreateComputePipeline(ref computePipelineDesc);
 
-            int lod = 0;
             _storageResourceSet = factory.CreateResourceSet(new ResourceSetDescription(octStorageLayout, 
                 _ctrbuf, _octTree));
 
-            _imgResourceSet = factory.CreateResourceSet(new ResourceSetDescription(imgLayout,
-                sides[0][lod],
-                sides[1][lod],
-                sides[2][lod],
-                sides[3][lod],
-                sides[4][lod],
-                sides[5][lod]));
+            _imgResourceSets = new ResourceSet[_sides[0].Length];
+            for (int lod = 0; lod < _imgResourceSets.Length; ++lod)
+            {
+                _imgResourceSets[lod] = factory.CreateResourceSet(new ResourceSetDescription(imgLayout,
+                    sides[0][lod],
+                    sides[1][lod],
+                    sides[2][lod],
+                    sides[3][lod],
+                    sides[4][lod],
+                    sides[5][lod]));
+            }
 
             InitResources(factory);
             _initialized = true;
@@ -107,7 +119,7 @@ namespace Vox
             if (!_initialized) { return; }
 
             Utils.Cl.SetPipeline(_computePipeline);
-            Utils.Cl.SetComputeResourceSet(0, _imgResourceSet);
+            Utils.Cl.SetComputeResourceSet(0, _imgResourceSets[0]);
             Utils.Cl.SetComputeResourceSet(1, _storageResourceSet);
             Utils.Cl.Dispatch(256, 1, 1);
         }

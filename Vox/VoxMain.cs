@@ -93,7 +93,7 @@ namespace Vox
             }
             else if (o == null)
             {
-                o = modelVox.BuildOct(4, 8);
+                o = modelVox.BuildOct();
                 if (o != null)
                 {
                     VertexArray va = OctViz.BuildVA(o);
