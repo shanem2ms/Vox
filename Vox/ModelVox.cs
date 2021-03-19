@@ -26,7 +26,7 @@ namespace Vox
             DownScale[] _mips;
             Texture[] _staging;
 
-            public TextureView[] View => _mips.Select(m => m.View).ToArray();
+            public TextureView[] View => new TextureView[] { _view }.Concat(_mips.Select(m => m.View)).ToArray();
 
             int idx;
 
@@ -250,10 +250,15 @@ namespace Vox
             }
         }
 
+        bool runcomp = false;
         public OctBuffer BuildOct()
         {
             int lodCnt = sides[0].LodCnt;
-            computeOct.RunCompute();
+            if (!runcomp)
+            {
+                computeOct.RunCompute();
+                runcomp = true;
+            }
             /*
             for (int i = 0; i < 6; ++i)
                 sides[i].CopyMips();

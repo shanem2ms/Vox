@@ -7,6 +7,7 @@ using System.Runtime.CompilerServices;
 using Veldrid;
 using Veldrid.SPIRV;
 using System.Runtime.InteropServices;
+using System.Collections.Generic;
 
 namespace Vox
 {
@@ -110,6 +111,36 @@ namespace Vox
             extension = "glsl";
             return File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Shaders", $"{name}.{extension}"));
         }
+
+        public static byte[] LoadShaderBytesPP(GraphicsDevice _gd, string name, string pp)
+        {
+            string extension;
+            extension = "glsl";
+            string []lines = File.ReadAllLines(Path.Combine(AppContext.BaseDirectory, "Shaders", $"{name}.{extension}"));
+            bool write = true;
+            List<string> outlines = new List<string>();
+            for (int idx = 0; idx < lines.Length; ++idx)
+            {
+                if (lines[idx].StartsWith("#if "))
+                {
+                    string symbol = lines[idx].Substring(4).Trim();
+                    if (symbol != pp)
+                        write = false;
+                }
+                else if (lines[idx].StartsWith("#endif"))
+                {
+                    write = true;
+                }
+                else if (write)
+                {
+                    outlines.Add(lines[idx]);
+                }
+            }
+
+            string outstr = string.Join("\n", outlines);
+            return System.Text.Encoding.ASCII.GetBytes(outstr);
+        }        
+
     }
 
     class Plane

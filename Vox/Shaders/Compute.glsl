@@ -15,42 +15,67 @@ layout(set = 0, binding = 5) uniform texture2D Side5;
 
 
 layout(std140, set=1, binding=0) buffer Ctr {
-  uint nextItem;
+  uint nextReadIdx;
+  uint nextWriteIdx;
+  uint readToIdx;
+  uint xyzmask;
 };
 
+struct Loc
+{
+    uint lev;
+    uint x;
+    uint y;
+    uint z;    
+};
+
+/*
+uint lev
+uint x
+uint y
+uint z
+uint child[8]
+uint flags
+uint color
+*/
 struct OctNode
 {
+    Loc l;
     uint child[8];
-    vec4 data1;
-    vec4 data2;
+    uint flags;
+    uint color;
 };
 
-layout(std140, set = 1, binding = 1) buffer OctTree
+layout(std430, set = 1, binding = 1) buffer OctTree
 {
     OctNode nodes[];
 };
 
 
-struct OctLoc
+Loc Loc_GetChild(Loc p, uint i)
 {
-    int x;    
-};
-
-
-layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
-
-void main()
-{
-    //vec4 val = texelFetch(Side0, ivec2(gl_GlobalInvocationID.xy), 0);
-    uint curItem = atomicAdd(nextItem, 1);
-    for (int i = 0; i < 8; i++) { nodes[curItem].child[i] = curItem; }
+    Loc lc;
+    lc.lev = p.lev + 1;
+    lc.x = p.x * 2 + (i & 1);
+    lc.y = p.y * 2 + ((i >> 1) & 1);
+    lc.z = p.z * 2 + ((i >> 2) & 1);
+    return lc;
 }
+
+vec3[2] Loc_GetBox(Loc l)
+{
+    float scale = 1.0f / float(1 << l.lev);
+    vec3 vr[2] = { vec3(l.x * scale, l.y * scale, l.z * scale),
+        vec3((l.x + 1) * scale, (l.y + 1) * scale, (l.z + 1) * scale)};
+    return vr;
+}
+
 
 const int eAllInside = 1;
 const int eAllOutside = 2;
 const int ePartial = 3;
 
-int IsHit(vec2 v, float nearz, float farz, texture2D near, texture2D far, int lod, out float c)
+int IsHit(vec2 v, float nearz, float farz, texture2D near, texture2D far, uint lod, out float c)
 {
     int size = 1 << lod;
     int w = int((v.x) * (size - 1));
@@ -81,39 +106,154 @@ int IsHit(vec2 v, float nearz, float farz, texture2D near, texture2D far, int lo
 }
 
 
-
-int IsHitX(vec3 mm0, vec3 mm1, texture2D sides[6], int lod, out float c)
+int IsHitX(vec3 mm[2], texture2D sides0, texture2D sides1, uint lod, out float c)
 {
     return IsHit(
-            vec2((mm0.x + mm1.x) * 0.5f,
-            (mm0.y + mm1.y) * 0.5f),
-    mm0.z, mm1.z,
-    sides[0],
-    sides[1],
+            vec2((mm[0].x + mm[1].x) * 0.5f,
+            (mm[0].y + mm[1].y) * 0.5f),
+    mm[0].z, mm[1].z,
+    sides0,
+    sides1,
     lod,
     c);
 }
 
-int IsHitY(vec3 mm0, vec3 mm1, texture2D sides[6], int lod, out float c)
+int IsHitY(vec3 mm[2], texture2D sides2, texture2D sides3, uint lod, out float c)
 {
     return IsHit(
-            vec2((mm0.x + mm1.x) * 0.5f,
-            1 - ((mm0.z + mm1.z) * 0.5f)),
-    mm0.y, mm1.y,
-    sides[2],
-    sides[3],
+            vec2((mm[0].x + mm[1].x) * 0.5f,
+            1 - ((mm[0].z + mm[1].z) * 0.5f)),
+    mm[0].y, mm[1].y,
+    sides2,
+    sides3,
     lod,
     c);
 }
 
-int IsHitZ(vec3 mm0, vec3 mm1, texture2D sides[6], int lod, out float c)
+int IsHitZ(vec3 mm[2], texture2D sides4, texture2D sides5, uint lod, out float c)
 {
     return IsHit(
-            vec2((mm0.z + mm1.z) * 0.5f,
-            (mm0.y + mm1.y) * 0.5f),
-    1 - mm1.x, 1 - mm0.x,
-    sides[4],
-    sides[5],
+            vec2((mm[0].z + mm[1].z) * 0.5f,
+            (mm[0].y + mm[1].y) * 0.5f),
+    1 - mm[1].x, 1 - mm[0].x,
+    sides4,
+    sides5,
     lod,
     c);
 }
+
+
+uint Oct_Create(Loc l, bool isLeaf, vec3 c)
+{
+    uint n = atomicAdd(nextWriteIdx, 1);
+    OctNode newnode;
+    newnode.l = l;
+    newnode.flags = isLeaf ? 1 : 0;
+    nodes[n] = newnode;
+    return n;
+}
+
+vec3 Decode(float c)
+{
+    return vec3(1,1,1);
+}
+
+#if BUILDBASEOCT
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+void main()
+{
+    uint curItem = nextReadIdx + gl_GlobalInvocationID.x;
+
+    if (curItem < readToIdx)
+    {
+        OctNode o = nodes[curItem];        
+        if ((o.flags & 1) == 1) return;
+
+        for (int i = 0; i < 8; ++i)
+        {
+            o.child[i] = Oct_Create(Loc_GetChild(o.l, i), false, vec3(0,0,0));
+        }
+
+        nodes[curItem] = o;
+    }
+}
+#endif
+
+#if BUILDOCT
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+void main()
+{
+    uint curItem = nextReadIdx + gl_GlobalInvocationID.x;
+
+    if (curItem < readToIdx)
+    {
+        OctNode o = nodes[curItem];        
+        if ((o.flags & 1) == 1) return;
+
+        bool lastLevel = (o.flags & 4) == 4;
+        for (int i = 0; i < 8; ++i)
+        {
+            Loc cl = Loc_GetChild(o.l, i);
+            bool skipx = (xyzmask & 1) == 0;
+            bool skipy = (xyzmask & 2) == 0;
+            bool skipz = (xyzmask & 4) == 0;
+            float cx = 0;
+            float cy = 0;
+            float cz = 0;
+            int hrX = skipx ? eAllInside : IsHitX(Loc_GetBox(cl), Side0, Side1, cl.lev, cx);
+            int hrY = skipy ? eAllInside : IsHitY(Loc_GetBox(cl), Side2, Side3, cl.lev, cy);
+            int hrZ = skipz ? eAllInside : IsHitZ(Loc_GetBox(cl), Side4, Side5, cl.lev, cz);
+            if ((hrX == eAllInside && hrY == eAllInside && hrZ == eAllInside)
+                || (lastLevel && hrX != eAllOutside && hrY != eAllOutside &&
+                hrZ != eAllOutside))
+            {
+                vec3 c = vec3(0,0,0);
+                if (cx > 0)
+                    c = Decode(cx);
+                if (cy > 0)
+                    c = Decode(cy);
+                if (cz > 0)
+                    c = Decode(cz);
+                o.child[i] = Oct_Create(cl, true, c);
+            }
+            else if ((hrX == ePartial || hrY == ePartial || hrZ == ePartial) &&
+                !lastLevel)
+            {
+                o.child[i] = Oct_Create(cl, false, vec3(0,0,0));
+            }
+        }                                
+
+        nodes[curItem] = o;
+    }
+}
+#endif
+
+#if SETVALS
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+void main()
+{
+    nextReadIdx = readToIdx;
+    readToIdx = nextWriteIdx;
+}
+#endif
+
+
+#if ZEROVALS
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+void main()
+{
+    nextReadIdx = readToIdx;
+    readToIdx = nextWriteIdx;
+    nextWriteIdx = 0;
+}
+#endif
+
+
+#if WRITECUBES
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+void main()
+{
+    nextReadIdx = readToIdx;
+    readToIdx = nextWriteIdx;
+}
+#endif
