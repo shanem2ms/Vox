@@ -255,5 +255,12 @@ void main()
 {
     nextReadIdx = readToIdx;
     readToIdx = nextWriteIdx;
+    uint curItem = nextReadIdx + gl_GlobalInvocationID.x;
+    if (curItem < readToIdx)
+    {
+        OctNode o = nodes[curItem];        
+        if ((o.flags & 1) != 1) return;
+    }
 }
 #endif
+
