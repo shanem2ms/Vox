@@ -52,6 +52,18 @@ layout(std430, set = 1, binding = 1) buffer OctTree
 };
 
 
+struct OctCube
+{
+    vec4 pos;
+};
+
+layout(std430, set = 1, binding = 2) buffer OctCubes
+{
+    OctCube cubes[];
+};
+
+
+
 Loc Loc_GetChild(Loc p, uint i)
 {
     Loc lc;
@@ -238,11 +250,11 @@ void main()
 #endif
 
 
-#if ZEROVALS
+#if SETVALS2
 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 void main()
 {
-    nextReadIdx = readToIdx;
+    nextReadIdx = 0;
     readToIdx = nextWriteIdx;
     nextWriteIdx = 0;
 }
@@ -250,16 +262,34 @@ void main()
 
 
 #if WRITECUBES
+
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 void main()
 {
-    nextReadIdx = readToIdx;
-    readToIdx = nextWriteIdx;
     uint curItem = nextReadIdx + gl_GlobalInvocationID.x;
+
     if (curItem < readToIdx)
     {
-        OctNode o = nodes[curItem];        
-        if ((o.flags & 1) != 1) return;
+        OctNode o = nodes[curItem];
+
+        if (o.child[0] != 0) return;
+        if (o.child[1] != 0) return;
+        if (o.child[2] != 0) return;
+        if (o.child[3] != 0) return;
+        if (o.child[4] != 0) return;
+        if (o.child[5] != 0) return;
+        if (o.child[6] != 0) return;
+        if (o.child[7] != 0) return;
+
+        uint n = atomicAdd(nextWriteIdx, 1);
+
+        OctCube cube;
+        vec3 vl[2] = Loc_GetBox(o.l);
+        cube.pos = vec4((vl[0].x + vl[1].x) * 0.5,
+        (vl[0].y + vl[1].y) * 0.5,
+        (vl[0].z + vl[1].z) * 0.5,
+        vl[1].x - vl[0].x);
+        cubes[n] = cube;
     }
 }
 #endif
