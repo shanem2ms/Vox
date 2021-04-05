@@ -23,8 +23,9 @@
   <ItemGroup>
     <EmbeddedResource Remove="Shaders\Blit-fragment.glsl" />
     <EmbeddedResource Remove="Shaders\Blit-vertex.glsl" />
+    <EmbeddedResource Remove="Shaders\BuildBase.hlsl" />
+    <EmbeddedResource Remove="Shaders\BuildOctTree.hlsl" />
     <EmbeddedResource Remove="Shaders\CBuffers.cs" />
-    <EmbeddedResource Remove="Shaders\Compute.glsl" />
     <EmbeddedResource Remove="Shaders\Depth-fragment.glsl" />
     <EmbeddedResource Remove="Shaders\Depth-vertex.glsl" />
     <EmbeddedResource Remove="Shaders\DepthDownScale-fragment.glsl" />
@@ -35,6 +36,25 @@
     <EmbeddedResource Remove="Shaders\Mirror-vertex.glsl" />
     <EmbeddedResource Remove="Shaders\Phong-fragment.glsl" />
     <EmbeddedResource Remove="Shaders\Phong-vertex.glsl" />
+    <EmbeddedResource Remove="Shaders\SetVals.hlsl" />
+    <EmbeddedResource Remove="Shaders\SetVals2.hlsl" />
+    <EmbeddedResource Remove="Shaders\WriteCubes.hlsl" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="Shaders\BuildBase.hlsl" />
+    <None Remove="Shaders\BuildOctTree.hlsl" />
+    <None Remove="Shaders\SetVals.hlsl" />
+    <None Remove="Shaders\SetVals2.hlsl" />
+    <None Remove="Shaders\WriteCubes.hlsl" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ComputeShader Include="Shaders\SetVals.hlsl" />
+    <ComputeShader Include="Shaders\SetVals2.hlsl" />
+    <ComputeShader Include="Shaders\WriteCubes.hlsl" />
+    <ComputeShader Include="Shaders\BuildOctTree.hlsl" />
+    <ComputeShader Include="Shaders\BuildBase.hlsl" />
   </ItemGroup>
 
   <ItemGroup>
@@ -42,9 +62,6 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="Shaders\Blit-vertex.glsl">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Shaders\Compute.glsl">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="Shaders\Depth-fragment.glsl">
@@ -81,12 +98,22 @@
 
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.HLSL.CSharpVB" Version="1.0.2" />
     <PackageReference Include="System.Drawing.Common" Version="5.0.1" />
     <PackageReference Include="Veldrid.SDL2" Version="4.8.0" />
-    <PackageReference Include="Veldrid.Spirv" Version="1.0.14" />
     <PackageReference Include="AssimpNet" Version="5.0.0-beta1" />
     <PackageReference Include="Veldrid.StartupUtilities" Version="4.8.0" />
     <PackageReference Include="Veldrid.Utilities" Version="4.8.0" />
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <ProjectReference Include="..\veldrid-spirv\src\Veldrid.SPIRV\Veldrid.SPIRV.csproj" />
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <Resource Include="Shaders\Compute.hlsl" />
   </ItemGroup>
 
 
@@ -98,6 +125,9 @@
 
 
   <ItemGroup>
+    <None Update="libveldrid-spirv.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="tesla.dae">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

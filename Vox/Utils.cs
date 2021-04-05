@@ -114,8 +114,11 @@ namespace Vox
 
         public static byte[] LoadShaderBytesPP(GraphicsDevice _gd, string name, string pp)
         {
-            string extension;
-            extension = "glsl";
+
+            return LoadShaderBytesPP(_gd, name, pp, "glsl");
+        }
+        public static byte[] LoadShaderBytesPP(GraphicsDevice _gd, string name, string pp, string extension)
+        {
             string []lines = File.ReadAllLines(Path.Combine(AppContext.BaseDirectory, "Shaders", $"{name}.{extension}"));
             bool write = true;
             List<string> outlines = new List<string>();
@@ -139,7 +142,12 @@ namespace Vox
 
             string outstr = string.Join("\n", outlines);
             return System.Text.Encoding.ASCII.GetBytes(outstr);
-        }        
+        }
+
+        public static byte[] LoadShaderBytes(string name)
+        {
+            return File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Shaders", name));
+        }
 
     }
 

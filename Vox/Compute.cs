@@ -23,12 +23,16 @@ namespace Vox
         private Pipeline _buildOctPipeline;
         private Shader _setValsCS;
         private Pipeline _setValsPipeline;
+        private Shader _setVals2CS;
+        private Pipeline _setVals2Pipeline;
         private Shader _writeCubesCS;
         private Pipeline _writeCubesPipeline;
         private ResourceSet _storageResourceSet;
         private ResourceSet[] _imgResourceSets;
         private bool _initialized;
         private TextureView[][] sides;
+
+        public DeviceBuffer OctCubes => _octCubes;
 
         [StructLayout(LayoutKind.Sequential)]
         struct OctLoc
@@ -56,7 +60,6 @@ namespace Vox
             public uint nextWriteIdx;
             public uint readToIdx;
             public uint xyzmask;
-            public bool isbaselod;
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -119,9 +122,9 @@ namespace Vox
             }
 
 
-            _buildBaseOctCS = factory.CreateFromSpirv(new ShaderDescription(
+            _buildBaseOctCS = factory.CreateShader(new ShaderDescription(
                 ShaderStages.Compute,
-                Utils.LoadShaderBytesPP(Utils.G, "Compute", "BUILDBASEOCT"),
+                Utils.LoadShaderBytes("BuildBase.cso"),
                 "main"));
 
             ComputePipelineDescription computePipelineDesc = new ComputePipelineDescription(
@@ -130,9 +133,9 @@ namespace Vox
                 1, 1, 1);
             _buildBaseOctPipeline = factory.CreateComputePipeline(ref computePipelineDesc);
 
-            _buildOctCS = factory.CreateFromSpirv(new ShaderDescription(
+            _buildOctCS = factory.CreateShader(new ShaderDescription(
                 ShaderStages.Compute,
-                Utils.LoadShaderBytesPP(Utils.G, "Compute", "BUILDOCT"),
+                Utils.LoadShaderBytes("BuildOctTree.cso"),
                 "main"));
 
             computePipelineDesc = new ComputePipelineDescription(
@@ -141,9 +144,9 @@ namespace Vox
                 1, 1, 1);
             _buildOctPipeline = factory.CreateComputePipeline(ref computePipelineDesc);
 
-            _setValsCS = factory.CreateFromSpirv(new ShaderDescription(
+            _setValsCS = factory.CreateShader(new ShaderDescription(
                 ShaderStages.Compute,
-                Utils.LoadShaderBytesPP(Utils.G, "Compute", "SETVALS"),
+                Utils.LoadShaderBytes("SetVals.cso"),
                 "main"));
 
             computePipelineDesc = new ComputePipelineDescription(
@@ -152,9 +155,20 @@ namespace Vox
                 1, 1, 1);
             _setValsPipeline = factory.CreateComputePipeline(ref computePipelineDesc);
 
-            _writeCubesCS = factory.CreateFromSpirv(new ShaderDescription(
+            _setVals2CS = factory.CreateShader(new ShaderDescription(
                 ShaderStages.Compute,
-                Utils.LoadShaderBytesPP(Utils.G, "Compute", "WRITECUBES"),
+                Utils.LoadShaderBytes("SetVals2.cso"),
+                "main"));
+
+            computePipelineDesc = new ComputePipelineDescription(
+                _setVals2CS,
+                new[] { imgLayout, octStorageLayout },
+                1, 1, 1);
+            _setVals2Pipeline = factory.CreateComputePipeline(ref computePipelineDesc);
+
+            _writeCubesCS = factory.CreateShader(new ShaderDescription(
+                ShaderStages.Compute,
+                Utils.LoadShaderBytes("WriteCubes.cso"),
                 "main"));
 
             computePipelineDesc = new ComputePipelineDescription(
@@ -174,7 +188,6 @@ namespace Vox
             {
                 nextReadIdx = 0,
                 nextWriteIdx = 1,
-                isbaselod = true,
                 readToIdx = 1,
                 xyzmask = 7
             };
@@ -209,9 +222,13 @@ namespace Vox
                 Utils.Cl.Dispatch(1, 1, 1);
             }
 
-            Utils.Cl.SetPipeline(_writeCubesPipeline);
+            Utils.Cl.SetPipeline(_setVals2Pipeline);
             Utils.Cl.SetComputeResourceSet(1, _storageResourceSet);
             Utils.Cl.Dispatch(1, 1, 1);
+
+            Utils.Cl.SetPipeline(_writeCubesPipeline);
+            Utils.Cl.SetComputeResourceSet(1, _storageResourceSet);
+            Utils.Cl.Dispatch(MaxOctNodes / 64, 1, 1);
         }
     }
 }
