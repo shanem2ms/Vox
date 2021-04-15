@@ -31,8 +31,9 @@ namespace Vox
         private ResourceSet[] _imgResourceSets;
         private bool _initialized;
         private TextureView[][] sides;
-
-        public DeviceBuffer OctCubes => _octCubes;
+        private DeviceBuffer cubesVB;
+        private DeviceBuffer cubesStg;
+        public DeviceBuffer OctCubes => cubesVB;        
 
         [StructLayout(LayoutKind.Sequential)]
         struct OctLoc
@@ -63,14 +64,16 @@ namespace Vox
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        struct OctCube
+        public struct OctCube
         {
             public Vector4 posscl;
         }
 
         const int MaxOctNodes = 1 << 18;
+        uint levels = 5;
         public void CreateResources(ResourceFactory factory, TextureView[][] _sides)
         {
+            levels = (uint)_sides[0].Length + 2;
             sides = _sides;
             uint ctrlen = (uint)Marshal.SizeOf<Ctr>();
             _ctrbuf = factory.CreateBuffer(new BufferDescription(ctrlen, BufferUsage.StructuredBufferReadWrite,
@@ -88,7 +91,9 @@ namespace Vox
                             new BufferDescription(
                                 cubesize * MaxOctNodes,
                                 BufferUsage.StructuredBufferReadWrite,
-                                cubesize)); 
+                                cubesize));
+
+            cubesVB = Utils.Factory.CreateBuffer(new BufferDescription(cubesize * MaxOctNodes, BufferUsage.VertexBuffer));
 
             ResourceLayout imgLayout = factory.CreateResourceLayout(new ResourceLayoutDescription(
                           new ResourceLayoutElementDescription("Side0", ResourceKind.TextureReadOnly, ShaderStages.Compute),
@@ -176,25 +181,24 @@ namespace Vox
                 new[] { imgLayout, octStorageLayout },
                 1, 1, 1);
             _writeCubesPipeline = factory.CreateComputePipeline(ref computePipelineDesc);
-            
 
-            InitResources(factory);
+            InitResources(factory, levels);
             _initialized = true;
         }
 
-        private void InitResources(ResourceFactory factory)
+        private void InitResources(ResourceFactory factory, uint levels)
         {
             Ctr ubo = new Ctr()
             {
                 nextReadIdx = 0,
                 nextWriteIdx = 1,
                 readToIdx = 1,
-                xyzmask = 7
+                xyzmask = (levels << 4) | 1
             };
             Utils.Cl.UpdateBuffer(_ctrbuf, 0, ref ubo);
         }
 
-
+        DeviceBuffer stgBuf;
         public void RunCompute()
         {
             if (!_initialized) { return; }
@@ -209,7 +213,7 @@ namespace Vox
                 Utils.Cl.SetComputeResourceSet(1, _storageResourceSet);
                 Utils.Cl.Dispatch(1, 1, 1);
             }
-            for (int i = 0; i < 6; ++i)
+            for (int i = 0; i < (levels - 2); ++i)
             {
                 Utils.Cl.SetPipeline(_buildOctPipeline);
                 Utils.Cl.SetComputeResourceSet(0, _imgResourceSets[i]);
@@ -229,6 +233,20 @@ namespace Vox
             Utils.Cl.SetPipeline(_writeCubesPipeline);
             Utils.Cl.SetComputeResourceSet(1, _storageResourceSet);
             Utils.Cl.Dispatch(MaxOctNodes / 64, 1, 1);
+
+            uint ctrlen = (uint)Marshal.SizeOf<Ctr>();
+            stgBuf = Utils.Factory.CreateBuffer(new BufferDescription(ctrlen, BufferUsage.Staging));
+            Utils.Cl.CopyBuffer(_ctrbuf, 0, stgBuf, 0, ctrlen);
+
+            uint cubesize = (uint)Marshal.SizeOf<OctCube>();
+            cubesStg = Utils.Factory.CreateBuffer(new BufferDescription(cubesize * MaxOctNodes, BufferUsage.Staging));
+            Utils.Cl.CopyBuffer(_octCubes, 0, cubesVB, 0, cubesize * MaxOctNodes);
         }
+
+        public uint CubeCnt()
+        {
+            MappedResourceView<Ctr> ctrarr = Utils.G.Map<Ctr>(stgBuf, MapMode.Read);
+            return ctrarr[0].nextWriteIdx;
+       }
     }
 }

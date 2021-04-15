@@ -9,11 +9,8 @@ void main(uint3 DTid : SV_DispatchThreadID)
     {
         OctNode o = nodes[curItem];
 
-        for (int i = 0; i < 8; ++i )
-        {
-            if (o.child[i] != 0)
-                return;
-        }
+        if ((o.flags & 1) == 0)
+            return;
 
         uint n;
         InterlockedAdd(ctr[0].nextWriteIdx, 1, n);
@@ -21,6 +18,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
         OctCube cube;
         float3 v0, v1;
         Loc_GetBox(o.l, v0, v1);
+        
         cube.pos = float4((v0.x + v1.x) * 0.5,
         (v0.y + v1.y) * 0.5,
         (v0.z + v1.z) * 0.5,

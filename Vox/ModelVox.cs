@@ -171,7 +171,7 @@ namespace Vox
 
         TextureView[] views = null;
         public TextureView []View => views;
-        static uint Size = 1024;
+        static uint Size = 128;
         DeviceBuffer[] materialCbs;
         ComputeOct computeOct = new ComputeOct();
 
@@ -251,7 +251,11 @@ namespace Vox
         }
 
         bool runcomp = false;
-        public OctBuffer BuildOct()
+
+        public uint CubeCnt => cubecnt;
+        uint cubecnt = 0;
+        public DeviceBuffer CubeBuffer => computeOct.OctCubes;
+        public void BuildOct()
         {
             int lodCnt = sides[0].LodCnt;
             if (!runcomp)
@@ -259,24 +263,11 @@ namespace Vox
                 computeOct.RunCompute();
                 runcomp = true;
             }
-            /*
-            for (int i = 0; i < 6; ++i)
-                sides[i].CopyMips();
-            if (sides[0]._pixelData[0][0].a == 1)
+                        
+            if (cubecnt == 0)
             {
-                MMTex[] mmtex = new MMTex[] { sides[0]._pixelData,
-                sides[1]._pixelData,
-                sides[2]._pixelData,
-                sides[3]._pixelData,
-                sides[4]._pixelData,
-                sides[5]._pixelData };
-                OctBuffer buf = new OctBuffer();
-                buf.Build(mmtex);
-                
-                return buf;
+                cubecnt = computeOct.CubeCnt();
             }
-            else*/
-                return null;
         }
     }
 }

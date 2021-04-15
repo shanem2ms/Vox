@@ -9,9 +9,6 @@ namespace Vox
 {
     public class VoxMain : SampleApplication
     {
-        private const uint OffscreenWidth = 1024;
-        private const uint OffscreenHeight = 1024;
-
         private Plane plane;
         private Pipeline _dbgPipeline;
         private DeviceBuffer[] blitTransform;
@@ -49,7 +46,7 @@ namespace Vox
                 GraphicsDevice.SwapchainFramebuffer.OutputDescription);
             _dbgPipeline = factory.CreateGraphicsPipeline(ref mirrorPD);
 
-            modelVox = new ModelVox(@"tesla.dae");
+            modelVox = new ModelVox(@"cube.obj");
 
             _dbgResourceSet = new ResourceSet[6];
             blitTransform = new DeviceBuffer[6];
@@ -84,6 +81,7 @@ namespace Vox
         OctBuffer o = null;
 
         static int frame = 0;
+        uint cubecnt = 0;
         private void DrawMain()
         {
             if (frame == 0)
@@ -91,13 +89,13 @@ namespace Vox
                 modelVox.DrawOffscreen();
                 Utils.FlushAtEnd = true;
             }
-            else if (o == null)
+            else if (cubecnt == 0)
             {
-                o = modelVox.BuildOct();
-                if (o != null)
+                modelVox.BuildOct();
+                cubecnt = modelVox.CubeCnt;
+                if (cubecnt != 0)
                 {
-                    VertexArray va = OctViz.BuildVA(o);
-                    octVizBlocks = new OctVizBlocks(va);
+                    octVizBlocks = new OctVizBlocks(cubecnt, modelVox.CubeBuffer);
                 }
             }
             Utils.Cl.SetFramebuffer(GraphicsDevice.SwapchainFramebuffer);

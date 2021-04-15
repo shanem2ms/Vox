@@ -294,17 +294,12 @@ namespace Vox
         public Vector3[] _positions;
         public uint[] _elems;
         public Vector3[] _normals;
-        public Vector4[] _instanceData0;
-        public Vector4[] _instanceData1;
 
-        public VertexArray(Vector3[] positions, uint[] elems, Vector3[] normals,
-            Vector4[] instanceData0, Vector4[] instanceData1)
+        public VertexArray(Vector3[] positions, uint[] elems, Vector3[] normals)
         {
             _positions = positions;
             _elems = elems;
             _normals = normals;
-            _instanceData0 = instanceData0;
-            _instanceData1 = instanceData1;
         }
         
     }

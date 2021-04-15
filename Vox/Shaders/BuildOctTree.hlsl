@@ -10,17 +10,18 @@ void main(uint3 DTid : SV_DispatchThreadID)
         OctNode o = nodes[curItem];        
         if ((o.flags & 1) == 1) return;
 
-        bool lastLevel = (o.flags & 4) == 4;
+        uint levels = (ctr[0].xyzmask >> 4);
         for (int i = 0; i < 8; ++i)
         {
             Loc cl = Loc_GetChild(o.l, i);
-            bool skipx = (ctr[0].xyzmask & 1) == 0;
-            bool skipy = (ctr[0].xyzmask & 2) == 0;
-            bool skipz = (ctr[0].xyzmask & 4) == 0;
+            bool skipx = false; //(ctr[0].xyzmask & 1) == 0;
+            bool skipy = true; //(ctr[0].xyzmask & 2) == 0;
+            bool skipz = true; //(ctr[0].xyzmask & 4) == 0;
             float cx = 0;
             float cy = 0;
             float cz = 0;
             float3 v0, v1;
+            bool lastLevel = (cl.lev == levels);
             Loc_GetBox(cl, v0, v1);
             int hrX = skipx ? eAllInside : IsHitX(v0, v1, Side0, Side1, cl.lev, cx);
             int hrY = skipy ? eAllInside : IsHitY(v0, v1, Side2, Side3, cl.lev, cy);

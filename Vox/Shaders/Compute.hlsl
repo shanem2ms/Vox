@@ -79,11 +79,11 @@ static const int ePartial = 3;
 int IsHit(float2 v, float nearz, float farz, Texture2D near, Texture2D far, uint lod, out float c)
 {
     int size = 1 << lod;
-    int w = int((v.x) * (size - 1));
-    int h = int((v.y) * (size - 1));
+    int w = int((v.x * 0.5f) * (size - 1));
+    int h = int((v.y * 0.5f) * (size - 1));
 
-    float4 nearcolor = near.Load(int3(w, h, 0));
-    float4 farcolor = far.Load(int3(w, h, 0));
+    float4 nearcolor = near.Load(int3(w + 0.5f, h + 0.5f, 0));
+    float4 farcolor = far.Load(int3(w + 0.5f, h + 0.5f, 0));
     float nearmax = nearcolor.r;
     float nearmin = nearcolor.g;
     float farmax = farcolor.r;
@@ -153,7 +153,6 @@ uint Oct_Create(Loc l, bool isLeaf, float3 c)
     newnode.color = 0;
     for (int i = 0; i < 8; ++i)
         newnode.child[i] = 0;
-
 
     nodes[n] = newnode;
     return n;

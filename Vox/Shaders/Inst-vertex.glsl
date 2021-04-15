@@ -14,7 +14,6 @@ struct Vox_Shaders_Inst_VertexInput
     vec3 Position;
     vec3 Normal;
     vec4 InstData0;
-    vec4 InstData1;
 };
 
 struct Vox_Shaders_Inst_FragmentInput
@@ -35,9 +34,9 @@ layout(set = 0, binding = 0) uniform t
 Vox_Shaders_Inst_FragmentInput VS( Vox_Shaders_Inst_VertexInput input_)
 {
     Vox_Shaders_Inst_FragmentInput output_;
-    vec4 v4Pos = vec4(input_.Position * input_.InstData0.w * 0.5f + vec3(input_.InstData0.x, input_.InstData0.y, input_.InstData0.z), 1);
+    vec4 v4Pos = vec4(input_.Position * input_.InstData0.w * 0.45f + vec3(input_.InstData0.x, input_.InstData0.y, input_.InstData0.z), 1);
     output_.fsNormal = input_.Normal;
-    output_.fsColor = vec3(input_.InstData1.x, input_.InstData1.y, input_.InstData1.z);
+    output_.fsColor = vec3(1, 1, 1);
     output_.Position = (field_t.Projection * field_t.View * field_t.Model) * v4Pos;
     vec4 eyePos = field_t.View * field_t.Model * v4Pos;
     output_.fsEyePos = vec3(eyePos.x, eyePos.y, eyePos.z);
@@ -50,7 +49,6 @@ Vox_Shaders_Inst_FragmentInput VS( Vox_Shaders_Inst_VertexInput input_)
 layout(location = 0) in vec3 Position;
 layout(location = 1) in vec3 Normal;
 layout(location = 2) in vec4 InstData0;
-layout(location = 3) in vec4 InstData1;
 layout(location = 0) out vec3 fsin_0;
 layout(location = 1) out vec3 fsin_1;
 layout(location = 2) out vec3 fsin_2;
@@ -62,7 +60,6 @@ void main()
     input_.Position = Position;
     input_.Normal = Normal;
     input_.InstData0 = InstData0;
-    input_.InstData1 = InstData1;
     Vox_Shaders_Inst_FragmentInput output_ = VS(input_);
     fsin_0 = output_.fsNormal;
     fsin_1 = output_.fsColor;
