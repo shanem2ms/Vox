@@ -1,12 +1,4 @@
-﻿Texture2D Side0;
-Texture2D Side1;
-Texture2D Side2;
-Texture2D Side3;
-Texture2D Side4;
-Texture2D Side5;
-
-
-struct Ctr {
+﻿struct Ctr {
   uint nextReadIdx;
   uint nextWriteIdx;
   uint readToIdx;

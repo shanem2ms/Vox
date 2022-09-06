@@ -1,4 +1,4 @@
-#include "Compute.hlsl"
+#include "Compute.glsl"
 
 [numthreads(1, 1, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
