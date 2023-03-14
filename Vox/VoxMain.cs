@@ -46,7 +46,7 @@ namespace Vox
                 GraphicsDevice.SwapchainFramebuffer.OutputDescription);
             _dbgPipeline = factory.CreateGraphicsPipeline(ref mirrorPD);
 
-            modelVox = new ModelVox(@"cube.obj");
+            modelVox = new ModelVox(@"tesla.dae");
 
             _dbgResourceSet = new ResourceSet[6];
             blitTransform = new DeviceBuffer[6];
@@ -102,7 +102,7 @@ namespace Vox
             Utils.Cl.SetFullViewports();
             Utils.Cl.ClearColorTarget(0, RgbaFloat.Black);
             Utils.Cl.ClearDepthStencil(1f);
-            if (octVizBlocks != null)
+            if (false && octVizBlocks != null)
             {
                 octVizBlocks.Draw(_camera);
             }

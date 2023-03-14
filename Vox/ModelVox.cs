@@ -4,7 +4,6 @@ using System.Linq;
 using System.IO;
 using System.Numerics;
 using Veldrid;
-using System.Collections.Generic;
 using Veldrid.SPIRV;
 using System.Runtime.InteropServices;
 
